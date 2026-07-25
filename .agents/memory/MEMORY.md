@@ -1,0 +1,5 @@
+- [`.replit` edits](dot-replit-edits.md) — must use `verifyAndReplaceDotReplit`, not direct `WriteFile`/`Edit`.
+- [Imported project setup](imported-project-setup.md) — after zip import, check `node_modules` and install dependencies before assuming the workflow will run.
+- [Supabase secrets storage](supabase-secrets-storage.md) — Supabase credentials belong in Replit Secrets only, never in `.replit` or committed files.
+- [Orchestrator model list](orchestrator-models.md) — `ORCHESTRATOR_MODELS` ordered by cost for cheapest-first fallback; `PRETTY`/`STRENGTHS` maps must be 1:1 with no duplicate keys.
+- [SSE preview reload filter](sse-preview-filter.md) — SSE `files` event should only reload iframe when code/markup files change, not for `attached/` uploads.

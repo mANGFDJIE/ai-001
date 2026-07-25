@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Агент</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="project-icon" id="projectIcon" title="Проект">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 2.5h4l1.2 2H13v8.5H3V2.5Z" fill="#8b78ff"/>
+          <path d="M4.5 6.5h7M4.5 9h5" stroke="#d7d2ff" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <span class="project-name" id="projectName" title="Двойной клик для редактирования">PotableMeaslyTreeszipzip</span>
+      <button class="run-btn" id="projectMenu" title="Меню проекта">⋮</button>
+      <button class="upgrade-btn" id="uploadProject" title="Загрузить файлы">＋ Upload</button>
+    </div>
+    <div class="topbar-tabs">
+      <button class="tab" data-tab="tools">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <path d="M9.5 1.5L11.5 3.5L5 10L2 11L3 8L9.5 1.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+        Tools
+      </button>
+      <button class="tab active" data-tab="preview">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <rect x="1.5" y="2.5" width="10" height="8" rx="1.2" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M4.5 5.5l2 2 2-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        Превью
+      </button>
+      <button class="tab" data-tab="files">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <path d="M2.5 2.5h6l3 3v7h-9v-10z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+          <path d="M8.5 2.5v3h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+        Файлы
+      </button>
+      <button id="workspaceTabAdd" class="tab tab-plus">+</button>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" id="searchBtn" title="Поиск">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M9.5 9.5l3 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="invite-btn">Invite</button>
+      <button class="publish-btn">Publish</button>
+      <button class="icon-btn" id="settingsBtn" title="Настройки">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M7 1.5v2M7 10.5v2M1.5 7h2M10.5 7h2M3.05 3.05l1.4 1.4M9.55 9.55l1.4 1.4M3.05 10.95l1.4-1.4M9.55 4.45l1.4-1.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Top URL bar + Canvas pill (Replit-like sub-row) -->
+  <div class="url-bar-row">
+    <button class="canvas-pill" id="canvasPill" title="Канвас / Helper">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+        <path d="M2.5 3h8v6H6.5L4.5 11V9H2.5V3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+      Canvas
+    </button>
+    <div class="url-bar">
+      <button class="url-back" title="Назад" aria-label="Назад">←</button>
+      <button class="url-forward" title="Вперёд" aria-label="Вперёд">→</button>
+      <button class="url-refresh" title="Обновить" aria-label="Обновить">↻</button>
+      <div class="url-host">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" class="url-icon">
+          <path d="M5.5 1A4.5 4.5 0 1 1 1 5.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+          <path d="M5.5 1v2.5H3" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="url-text">replit.dev/</span>
+      </div>
+      <div class="url-tail">
+        <button class="url-action" title="Инструменты">🔧</button>
+        <button class="url-action" title="Деплой">⚡</button>
+        <button class="url-action" title="Открыть в новой вкладке">↗</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <!-- Left sidebar icons -->
+    <aside class="sidebar">
+      <button class="side-btn active" title="Чат">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M3 3h12v10H9.5L6 16v-3H3V3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="side-btn" title="Файлы">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M4 2h6l4 4v10H4V2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+          <path d="M10 2v4h4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="side-btn" title="Поиск">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M12 12l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="side-btn side-add" title="Добавить">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M9 4v10M4 9h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </aside>
+
+    <!-- Chat panel -->
+    <div class="chat-panel" id="chatPanel">
+      <section class="task-card" aria-label="Активная модель">
+        <div class="task-card-head">
+          <div class="task-title-wrap">
+            <span class="model-logo" id="modelLogo">A</span>
+            <span class="model-loader" id="modelLoader" aria-hidden="true">
+              <svg class="ring" viewBox="0 0 22 22" width="22" height="22">
+                <circle cx="11" cy="11" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="3 3"/>
+              </svg>
+              <span class="play"><svg viewBox="0 0 22 22" width="10" height="10"><polygon points="7.5,4.5 7.5,17.5 17.5,11"/></svg></span>
+            </span>
+            <span class="task-kicker">Active model</span>
+          </div>
+          <div class="task-actions">
+            <button class="task-icon-btn" id="taskCopy" title="Копировать задачу">▣</button>
+            <button class="task-icon-btn" id="taskMenu" title="Меню задачи">⋮</button>
+          </div>
+        </div>
+        <div class="task-title">
+          <span id="activeModelLabel">Авто</span>
+          <span class="model-type-badge" id="activeModelType">Auto</span>
+        </div>
+        <div class="task-model-desc" id="activeModelDesc">Автоподбор модели по типу задачи и сложности</div>
+      </section>
+      <div class="messages" id="messages"></div>
+
+      <!-- Input area -->
+      <div class="input-area">
+        <div class="input-box">
+          <textarea
+            id="userInput"
+            placeholder="Напишите задачу или вопрос..."
+            rows="1"
+            maxlength="8000"
+          ></textarea>
+          <div class="input-actions-top">
+            <button class="select-btn" id="selectBtn" title="Выбрать элемент в превью">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2.5 2l9.5 4-3.6 1.5L7 11 2.5 2z" fill="currentColor" stroke="currentColor" stroke-width="0.8" stroke-linejoin="round"/>
+                <circle cx="11.5" cy="11.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/>
+              </svg>
+            </button>
+            <button class="attach-btn" title="Прикрепить файл">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <path d="M12.5 7L7 12.5A4 4 0 012.5 8L8 2.5A2.5 2.5 0 0111.5 6L6 11.5A1 1 0 014.5 10L9 5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <button class="img-btn" title="Изображение">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <rect x="1.5" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+                <circle cx="5" cy="6" r="1" fill="currentColor"/>
+                <path d="M1.5 10l3.5-3 3 3 2-2 3 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="input-footer">
+          <div class="footer-left">
+            <div class="model-selector" id="modelSelector">
+              <span class="model-dot" id="modelDot"></span>
+              <span id="modelLabel">Авто</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2.5 4l2.5 2.5L7.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <label class="plan-toggle">
+              <input type="checkbox" id="planMode" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-label">Планировщик</span>
+            </label>
+            <button class="mic-btn" id="micBtn" title="Голосовой ввод">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="4.5" y="1" width="5" height="8" rx="2.5" stroke="currentColor" stroke-width="1.2"/>
+                <path d="M2 7.5A5 5 0 0012 7.5M7 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="footer-right">
+            <button class="send-btn" id="sendBtn" title="Отправить">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M14 2L2 7.5 7.5 9M14 2L9 14l-1.5-5M14 2L7.5 9" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel: Preview / Tools / Canvas -->
+    <div class="panel-resize-handle" id="panelResizeHandle" aria-hidden="true"></div>
+    <div class="right-panel" id="rightPanel">
+      <!-- Workspace tabs moved to <header.topbar>.topbar-tabs -->
+
+      <div class="right-panel-inner tools-view" data-tab="tools" id="toolsView">
+        <div class="canvas-label">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M3 6h6M6 3v6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+          </svg>
+          Холст
+        </div>
+        <div class="canvas-area" id="canvasArea">
+          <div class="canvas-empty">
+            <div class="canvas-icon">
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                <rect x="4" y="4" width="32" height="32" rx="6" stroke="#3b4258" stroke-width="2"/>
+                <path d="M13 20h14M20 13v14" stroke="#3b4258" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <p>Холст пуст</p>
+            <span>Здесь будут отображаться результаты</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="right-panel-inner files-view" data-tab="files" id="filesView">
+        <aside class="preview-tree library" id="previewTree">
+          <div class="library-header">
+            <div class="library-header-left">
+              <span class="library-title">Library</span>
+              <span class="library-hint">Close library <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>L</kbd></span>
+            </div>
+            <div class="library-header-right">
+              <button class="library-menu" id="libraryMenu" title="Действия" aria-label="Меню">⋮</button>
+              <button class="tree-icon-btn" id="previewUpload" title="Загрузить файл (или перетащите)">↑</button>
+            </div>
+          </div>
+          <div class="library-search-row">
+            <input type="search" id="librarySearch" placeholder="Search files" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="library-sections" id="previewTreeList">
+            <div class="preview-tree-empty">Нет файлов</div>
+          </div>
+          <div class="preview-changes" id="previewChanges"></div>
+        </aside>
+      </div>
+
+      <div class="right-panel-inner preview-view active" data-tab="preview" id="previewView">
+        <div class="preview-status" id="previewStatus"><span class="dot"></span><span class="label">Live</span></div>
+        <iframe id="previewFrame" src="/preview/" title="Превью" class="preview-only-iframe"></iframe>
+        <div class="preview-console collapsed">
+          <div class="preview-console-toolbar">
+            <button class="preview-console-toggle" id="previewConsoleToggle" title="Свернуть/развернуть консоль" aria-label="Свернуть/развернуть консоль">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                <path d="M2.5 3.5L5 6L7.5 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <span class="preview-console-title">Console</span>
+            <div class="preview-console-filters" id="previewConsoleFilters">
+              <button class="filter-btn active" data-filter="all">all</button>
+              <button class="filter-btn" data-filter="log">log</button>
+              <button class="filter-btn" data-filter="info">info</button>
+              <button class="filter-btn" data-filter="warn">warn</button>
+              <button class="filter-btn error" data-filter="error">err</button>
+              <button class="filter-btn error" data-filter="unhandledrejection">×</button>
+            </div>
+            <button class="preview-console-clear" id="previewConsoleClear" title="Очистить консоль">×</button>
+          </div>
+          <div class="preview-console-out" id="previewConsole">
+            <div class="preview-console-empty">Логи iframe появятся здесь после запуска превью</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model picker dropdown -->
+  <div class="dropdown" id="modelDropdown"></div>
+
+  <!-- WebLLM runtime (browser-side, no API key) -->
+  <script type="module" src="webllm-chat.js"></script>
+
+  <!-- Supabase sync (chat history, loaded models, file backup) -->
+  <script defer src="supabase-sync.js"></script>
+
+  <!-- Settings panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-header">
+      <span>Настройки агента</span>
+      <button id="closeSettings">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="settings-body">
+      <div class="settings-section">
+        <h3>Локальные модели (WebLLM)</h3>
+        <p class="settings-hint">Все модели запускаются прямо в браузере через WebGPU. Скачиваются один раз и кэшируются. Ключи и подписки не нужны.</p>
+        <div class="provider-grid" id="providerGrid"></div>
+      </div>
+      <div class="settings-section">
+        <h3>Диагностика</h3>
+        <p class="settings-hint">Проверьте поддержку WebGPU и доступное хранилище для моделей.</p>
+        <button class="scan-btn" id="scanModels">Проверить WebGPU</button>
+        <div class="scan-status" id="scanStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <script defer src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+node_modules/
+.cache/
+.env
+.local/
+screenshots/
+attached_assets/
+zipFile.zip
+.DS_Store

@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Qq9pyFkyWdPUdLBkfeQvp"
+uri = "file://supabase/schema.sql"
+type = "unspecified"
+title = "schema.sql — полный текст для SQL Editor"

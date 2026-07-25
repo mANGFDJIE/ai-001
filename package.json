@@ -1,0 +1,15 @@
+{
+  "name": "agent-ui",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@mlc-ai/web-llm": "^0.2.84",
+    "@supabase/supabase-js": "^2.110.8",
+    "express": "^4.22.2",
+    "pg": "^8.22.0"
+  }
+}
