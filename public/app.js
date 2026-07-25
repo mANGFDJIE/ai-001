@@ -138,62 +138,14 @@
         local: true
       };
     }
-    // Если облачный провайдер доступен — по умолчанию стартуем с ⭐ Авто
-    // (лёгкий маршрутизатор deepseek-coder: сам решит, кому делегировать).
-    if (config.hasOpenAI && (currentModel === 'auto' || currentModel === 'orchestrator')) {
-      currentModel = 'orchestrator';
+    // Если облачный провайдер доступен — по умолчанию стартуем с ⭐ Мульти-агент.
+    if (config.hasOpenAI && (currentModel === 'auto' || currentModel === 'orchestrator' || currentModel === 'openai-chat' || currentModel === 'deepseek-reasoner' || currentModel.startsWith('featured-'))) {
+      currentModel = 'multi';
     }
 
     // Add OpenAI-compatible models (DeepSeek, OpenAI, OpenRouter…)
     if (config.hasOpenAI) {
-      const base = config.openaiBaseURL || '';
-      const isDeepSeek = base.includes('deepseek');
-      const isOpenAI = base.includes('openai');
-      const isOpenRouter = base.includes('openrouter');
-      const isVseGpt = base.includes('vsegpt');
-      // vsegpt принимает только префиксные id формата "provider/model" (напр. deepseek/deepseek-coder);
-      // нативный DeepSeek ждёт id без слеша; OpenRouter — с версией.
-      // Router для default LLM (используется в fallback outside of vsegpt orchestrator).
-      // deepseek-chat удалён как «Мы видим»-verbose, переключаем на coder.
-      const routerFallback = isVseGpt  ? 'openai/gpt-4.1-nano'
-                                    : isOpenRouter ? 'openai/gpt-4.1-nano'
-                                    : isDeepSeek ? 'deepseek-chat'
-                                    : (isOpenAI ? 'gpt-4o-mini' : '');
-      const r1Model = (isOpenRouter || isVseGpt) ? 'deepseek/deepseek-r1'
-                                   : isDeepSeek ? 'deepseek-reasoner'
-                                   : '';
-      const v3Label = isDeepSeek || isOpenRouter ? 'DeepSeek V3' : isOpenAI ? 'GPT-4o' : 'Chat';
-      const r1Label = isDeepSeek || isOpenRouter ? 'DeepSeek R1' : '';
-      const v3Desc = isDeepSeek || isOpenRouter ? 'DeepSeek-V3 — мощная модель'
-                   : isOpenAI ? 'GPT-4o-mini через OpenAI-совместимый прокси'
-                   : 'OpenAI-совместимая модель';
-      modelPresets['openai-chat'] = {
-        name: v3Label, label: v3Label, color: 'pro',
-        desc: v3Desc,
-        openai: true,
-        apiModel: routerFallback
-      };
-      if (r1Model) {
-        modelPresets['deepseek-reasoner'] = {
-          name: r1Label, label: r1Label, color: 'pro',
-          desc: 'DeepSeek-R1 — reasoning-модель, сложные задачи, математика',
-          openai: true,
-          apiModel: r1Model
-        };
-      }
-
-      // ── Авто и мульти-агент — лёгкая gpt-5-mini как маршрутизатор.
-      //    Сама решает: ответить прямой, делегировать одному эксперту, или параллельно опросить 3 модели.
-      // Используем ключ 'orchestrator' (а не 'auto'), чтобы legacy-ветка
-      // if (currentModel === 'auto') не пыталась дёргать window.llm.pickAuto.
-      modelPresets['orchestrator'] = {
-        name: '⭐ Авто', label: '⭐ Авто', color: 'auto',
-        desc: 'Роутер (GPT-4.1 Nano) решит: ответить напрямую или делегировать лучшей модели под задачу (≤0.2₽/запрос)',
-        openai: true,
-        apiModel: 'openai/gpt-4.1-nano',
-        router: 'auto',
-        featured: true
-      };
+      // ── Мульти-агент — лёгкий роутер, всегда параллельно опрашивает 2–3 модели.
       modelPresets['multi'] = {
         name: '⭐ Мульти-агент', label: '⭐ Мульти-агент', color: 'pro',
         desc: 'Роутер (GPT-4.1 Nano) параллельно опрашивает 2–3 модели и синтезирует лучший ответ (≤0.2₽/запрос)',
@@ -203,37 +155,6 @@
         featured: true
       };
 
-      // ── Топ-модели (⭐) — провайдер vsegpt отдаёт префиксованные id вида "provider/name".
-      //    Это самые сильные модели в каталоге (reasoning + крупные).
-      if (isVseGpt) {
-        const featured = [
-          // 0₽ · бесплатно
-          { id: 'perplexity/latest-large-online',  label: 'Perplexity Large',    desc: '🆓 0₽ — GPT-4 class, веб-поиск, 127K' },
-          { id: 'perplexity/latest-small-online',  label: 'Perplexity Small',    desc: '🆓 0₽ — быстрый, веб-поиск, 32K' },
-          // ~0.015₽/1K · топ-дешёвые кодеры (≈0.06–0.15₽ за запрос)
-          { id: 'openai/gpt-4.1-nano',             label: 'GPT-4.1 Nano',        desc: '💰 0.015/1K — роутер, 1M контекст, structured JSON' },
-          { id: 'vis-openai/gpt-5-nano',           label: 'GPT-5 Nano 👁',       desc: '💰 0.015/1K — GPT-5 Nano, vision, 400K' },
-          { id: 'openai/gpt-oss-120b',             label: 'GPT-OSS 120B',        desc: '💰 0.015/1K — 120B открытая, отличный код, 128K' },
-          { id: 'google/gemini-2.5-flash-lite',    label: 'Gemini 2.5 Lite',     desc: '💰 0.015/1K — Google, 1M контекст, быстрый' },
-          // ~0.022₽/1K
-          { id: 'qwen/qwen3-coder-next',           label: 'Qwen3 Coder Next',    desc: '💰 0.022/1K — Qwen3 кодер следующего поколения, 256K' },
-          // ~0.03–0.036₽/1K
-          { id: 'meta-llama/llama-4-maverick',     label: 'Llama 4 Maverick',    desc: '💰 0.03/1K — сильная Llama 4, 1M контекст' },
-          { id: 'deepseek/deepseek-v4-flash',      label: 'DeepSeek V4 Flash',   desc: '💰 0.036/1K — DeepSeek V4, 1M контекст' },
-        ];
-        featured.forEach((f, i) => {
-          const isFree = i < 2; // первые 2 — бесплатные perplexity
-          modelPresets[`featured-${i}`] = {
-            name: (isFree ? '🆓 ' : '💰 ') + f.label,
-            label: (isFree ? '🆓 ' : '💰 ') + f.label,
-            color: 'economy',
-            desc: f.desc,
-            openai: true,
-            apiModel: f.id,
-            featured: true
-          };
-        });
-      }
     }
 
     renderModelDropdown();
@@ -1740,6 +1661,10 @@
       const m = routerResp.match(/\{[\s\S]*?\}/);
       decision = JSON.parse(m ? m[0] : routerResp);
     } catch {}
+    // В режиме Мульти-агент всегда форсируем multi, даже если router вернул delegate/direct.
+    if (mode === 'multi' && decision.action !== 'multi') {
+      decision = { action: 'multi', models: [] };
+    }
     if (decision.action === 'direct') {
       const directText = (decision.answer && decision.answer.trim()) || routerResp || '';
       // Если задача явно про код, а ответ маршрутизатора — verbose prose
