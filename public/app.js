@@ -1780,12 +1780,18 @@
         onStep && onStep('Router превысил бюджет 0.2₽ (' + estimatedCost.toFixed(2) + '₽) → пересобираю под бюджет');
         ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
       }
-      // Распределяем max_tokens под бюджет.
+      // Распределяем max_tokens под бюджет. Для multi используем slim-контекст,
+      // иначе workspace-контекст раздувает запрос до 90K+ токенов и превышает 0.2₽.
       const maxTokensList = allocateMaxTokens(ids, BUDGET_RUB, 1500);
-      onStep && onStep('Параллельный опрос ' + ids.length + ' моделей (бюджет ≤0.2₽)…');
+      onStep && onStep('Параллельный опрос ' + ids.length + ' моделей (бюджет ≤0.2₽, slim-контекст)…');
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
       const results = await Promise.all(ids.map(async (id, idx) => {
+        // gpt-4.1-nano и другие лёгкие модели rate-limit: не более 1 запроса/сек.
+        await sleep(idx * 1200);
         try {
-          const r = await callOpenAI(id, await delegateMessages(id), maxTokensList[idx]);
+          const supportsVision = !!ORCHESTRATOR_MODELS.find(m => m.id === id)?.vision;
+          const msgs = await slimDelegateMessages(id, supportsVision, content, attachments);
+          const r = await callOpenAI(id, msgs, maxTokensList[idx]);
           if (r.error) return { id, error: r.error };
           return { id, text: r.text };
         } catch (err) {
