@@ -35,7 +35,7 @@
     el.style.display = v ? 'inline-flex' : 'none';
     el.classList.toggle('is-running', !!v);
   }
-  const LLM_SYSTEM_PROMPT = 'You are an autonomous AI coding agent embedded in a web-based IDE. You build modern web apps, landing pages, dashboards, and full-stack applications.\n\n=== CODE OUTPUT (REQUIRED) ===\nWhen you return ANY code for a file, you MUST include a path marker — one of two ways:\n(1) in the info-string: ```html // file: index.html\n(2) first line inside the block: // file: index.html  OR  <!-- file: index.html -->\nWithout the marker the file will NOT save to workspace. Marker is REQUIRED for any code that lands on disk.\nDefault auto-naming: HTML → index.html, CSS → styles.css, JS → script.js, JSON → data.json.\nIf the file already exists in workspace, EDIT it — do not create a duplicate.\n\n=== PREVIEW ENVIRONMENT (CRITICAL) ===\nThe preview is a STATIC Express server that serves plain HTML/CSS/JS files from workspace/preview/.\nDO NOT generate React, Next.js, Vue, Svelte, TypeScript (.tsx/.jsx/.ts) files — they CANNOT be rendered.\nNEVER output paths like app/page.tsx, pages/index.tsx, src/App.jsx — these will show as raw code, not a page.\nALWAYS output: index.html (+ styles.css + script.js if needed). One self-contained HTML file works best.\nExceptions: only use JSX/TSX if the user explicitly says "React project" AND the workspace already has package.json with React.\n\n=== MODERN STACK (HTML-first defaults) ===\n• Structure: single index.html with embedded or linked CSS/JS — fully self-contained, no build step\n• CSS: modern CSS (custom properties, grid, flexbox, container queries, @keyframes) — NO Tailwind unless CDN-linked\n• JS: vanilla ES6+ with CDN libraries where needed (e.g. <script src="https://unpkg.com/...">)\n• Design: dark theme by default; Google Fonts via <link>; smooth CSS transitions; glassmorphism/neumorphism if "modern" requested\n• Icons: Lucide via CDN (<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js">) or inline SVG\n• Palette: sophisticated dark (#0a0a0f bg, #7c3aed accent) or premium light — avoid basic neon unless cyberpunk requested\n• Landing pages: hero with gradient text, bento grid, feature cards, social proof section, CTA — Vercel/Linear/Stripe aesthetic\n• Components: fully functional, not placeholder — real interactivity with JS where needed\n• Mobile-first responsive: use CSS clamp(), min(), max() for fluid typography; media queries for layout\n\n=== TONE (STRICT) ===\nWrite like a Replit agent engineer. Max 2-4 prose sentences. No leads (Let us, Well, Currently I, I will review, We should, Here is my plan, Let us begin). No explaining the obvious. No follow-up questions.\nFormat: what changed (filename — one-line gist, comma-separated if multiple). If error: one sentence on what failed.\n\n=== TARGET-FILE RULE ===\nWhen user-content carries a [🎯 ЦЕЛЬ ОПЕРАЦИИ] block with explicit Fayl-cel: ...path.ext, edit STRICTLY that file. Do not ask which file. Just modify it.\n\n=== SELECTED-ELEMENT HINT ===\nIf user mentions ⌖ <tag> in their text, treat it as a soft pointer to the attached selected-element chip. Use pagePath from the chip, not inferred from tag.\n\nReply in Russian if the request is in Russian.\n';
+  const LLM_SYSTEM_PROMPT = 'You are an autonomous AI coding agent embedded in a web-based IDE. You build modern web apps, landing pages, dashboards, and full-stack applications.\n\n=== CODE OUTPUT (REQUIRED) ===\nWhen you return ANY code for a file, you MUST include a path marker — one of two ways:\n(1) in the info-string: ```html // file: index.html\n(2) first line inside the block: // file: index.html  OR  <!-- file: index.html -->\nWithout the marker the file will NOT save to workspace. Marker is REQUIRED for any code that lands on disk.\nDefault auto-naming: HTML → index.html, CSS → styles.css, JS → script.js, JSON → data.json.\nIf the file already exists in workspace, EDIT it — do not create a duplicate.\n\n=== PREVIEW ENVIRONMENT (CRITICAL) ===\nThe preview is a STATIC Express server that serves plain HTML/CSS/JS files from workspace/preview/.\nDO NOT generate React, Next.js, Vue, Svelte, TypeScript (.tsx/.jsx/.ts) files — they CANNOT be rendered.\nNEVER output paths like app/page.tsx, pages/index.tsx, src/App.jsx — these will show as raw code, not a page.\nALWAYS output: index.html (+ styles.css + script.js if needed). One self-contained HTML file works best.\nExceptions: only use JSX/TSX if the user explicitly says "React project" AND the workspace already has package.json with React.\n\n=== MODERN STACK (HTML-first defaults) ===\n• Structure: single index.html with embedded or linked CSS/JS — fully self-contained, no build step\n• CSS: modern CSS (custom properties, grid, flexbox, container queries, @keyframes) — NO Tailwind unless CDN-linked\n• JS: vanilla ES6+ with CDN libraries where needed (e.g. <script src="https://unpkg.com/...">)\n• Design: dark theme by default; Google Fonts via <link>; smooth CSS transitions; glassmorphism/neumorphism if "modern" requested\n• Icons: Lucide via CDN (<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js">) or inline SVG\n• Palette: sophisticated dark (#0a0a0f bg, #7c3aed accent) or premium light — avoid basic neon unless cyberpunk requested\n• Landing pages: hero with gradient text, bento grid, feature cards, social proof section, CTA — Vercel/Linear/Stripe aesthetic\n• Components: fully functional, not placeholder — real interactivity with JS where needed\n• Mobile-first responsive: use CSS clamp(), min(), max() for fluid typography; media queries for layout\n\n=== MOBILE UI LEVEL (REQUIRED) ===\nThe user expects production-quality mobile app interfaces comparable to the attached screenshots: polished profile cards, marketplace service cards, bottom tab navigation, gradient backgrounds, rounded corners, soft shadows, clear hierarchy, and premium feel. When asked for a mobile UI or mini-app, you MUST deliver at least this level:\n• Full mobile viewport simulation (width ~375-430px), centered on desktop, full bleed on mobile.\n• Header card with large gradient or photo + avatar, name, status badge, stats row (likes, views, matches).\n• Rounded large cards (border-radius 16-24px) with soft shadows, clear sections, and ample whitespace.\n• Bottom tab navigation with 3-5 icons and active state indicator.\n• Top-tier typography: bold headings, subtle labels, harmonious Russian text.\n• Material 3 / iOS style: switch toggles, list items with chevrons, icons from Lucide.\n• Color: either vibrant gradient (pink, blue, purple) or premium dark theme; avoid flat, ugly, default browser styles.\n• If a screenshot/reference is attached, replicate its visual structure, proportions, and color mood — not just the layout idea.\n\n=== TONE (STRICT) ===\nWrite like a Replit agent engineer. Max 2-4 prose sentences. No leads (Let us, Well, Currently I, I will review, We should, Here is my plan, Let us begin). No explaining the obvious. No follow-up questions.\nFormat: what changed (filename — one-line gist, comma-separated if multiple). If error: one sentence on what failed.\n\n=== TARGET-FILE RULE ===\nWhen user-content carries a [🎯 ЦЕЛЬ ОПЕРАЦИИ] block with explicit Fayl-cel: ...path.ext, edit STRICTLY that file. Do not ask which file. Just modify it.\n\n=== SELECTED-ELEMENT HINT ===\nIf user mentions ⌖ <tag> in their text, treat it as a soft pointer to the attached selected-element chip. Use pagePath from the chip, not inferred from tag.\n\nReply in Russian if the request is in Russian.\n';
 
   // Склеивает текст + прикреплённые картинки в OpenAI multimodal content
   // (image_url parts), чтобы модель реально видела скриншоты в диалоге, а не
@@ -111,6 +111,24 @@
       const r = await fetch('/api/config');
       config = await r.json();
     } catch {}
+
+    // Загружаем каталог моделей (бесплатно) и обновляем ростер оркестратора.
+    async function scanModelCatalog() {
+      try {
+        const mr = await fetch('/api/models');
+        const modelsData = await mr.json();
+        if (modelsData && Array.isArray(modelsData.data)) {
+          refreshOrchestratorModels(modelsData.data);
+        }
+      } catch (e) { console.log('[models] авто-сканер не смог загрузить каталог:', e); }
+    }
+    if (config.hasOpenAI) {
+      await scanModelCatalog();
+      // Повторный скан каждые 30 минут — ловим новые дешёвые модели и убираем исчезнувшие.
+      if (!window.__modelScanInterval) {
+        window.__modelScanInterval = setInterval(scanModelCatalog, 30 * 60 * 1000);
+      }
+    }
 
     // Add local LLM preset if available
     if (config.hasLocalLLM) {
@@ -1353,6 +1371,23 @@
     return /Exceeded|soft user limit|expected price|expected_cost|insufficient|not enough|balance|not available|upgrade.*subscription|subscription plan|model.*not.*supported|недоступн|не хватает|лимит|лими/i.test(String(msg));
   }
 
+  // Чёрный список моделей, которые вернули ошибку доступности/плана.
+  // Храним в sessionStorage, чтобы не пытаться их повторно в рамках сессии.
+  function unavailableModels() {
+    try {
+      const raw = sessionStorage.getItem('orchestrator_unavailable_models');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  }
+  function markUnavailable(id) {
+    try {
+      const s = unavailableModels();
+      s.add(id);
+      sessionStorage.setItem('orchestrator_unavailable_models', JSON.stringify([...s]));
+    } catch {}
+  }
+  function isAvailableModel(id) { return !unavailableModels().has(id); }
+
   // Когда бюджет VseGPT «Exceeded soft user limit» — пробовать тот же тяжёлый
   // delegateMessages с полным workspace-контекстом бессмысленно (входной контекст
   // стоит денег, и даже дешёвая модель перевалит за 10 ₽). Для таких случаев —
@@ -1424,21 +1459,134 @@
   //   reasoning-> пошаговое планирование.
   // Ordered by cost (ascending) — router prefers cheapest model that can handle the task.
   // Falls back up the list on budget/availability errors (isBudgetOrModelError).
-  const ORCHESTRATOR_MODELS = [
-    // 0₽ — бесплатные
-    { id: 'perplexity/latest-large-online',  tier: 'mid',   coding: true,  vision: false, cost: 0  },
-    { id: 'perplexity/latest-small-online',  tier: 'light', coding: false, vision: false, cost: 0  },
-    // 0.015₽/1K — топ-дешёвые кодеры
-    { id: 'openai/gpt-4.1-nano',             tier: 'mid',   coding: true,  vision: false, cost: 1  },
-    { id: 'vis-openai/gpt-5-nano',           tier: 'mid',   coding: true,  vision: true,  cost: 2  },
-    { id: 'openai/gpt-oss-120b',             tier: 'mid',   coding: true,  vision: false, cost: 3  },
-    { id: 'google/gemini-2.5-flash-lite',    tier: 'mid',   coding: true,  vision: false, cost: 4  },
-    // 0.022₽/1K
-    { id: 'qwen/qwen3-coder-next',           tier: 'mid',   coding: true,  vision: false, cost: 5  },
-    // 0.03–0.036₽/1K
-    { id: 'meta-llama/llama-4-maverick',     tier: 'mid',   coding: true,  vision: false, cost: 6  },
-    { id: 'deepseek/deepseek-v4-flash',      tier: 'mid',   coding: true,  vision: false, cost: 7  },
+  // Бюджет на один запрос (руб). 0.2₽ ≈ 2–3 параллельные модели.
+  const BUDGET_RUB = 0.2;
+  // Цены prompt/completion в ₽ за 1000 токенов — актуальны для VseGPT.ru на момент правки.
+  // Сортировка: сначала сильные дешёвые, потом мощнее. Router идёт сверху вниз.
+  // Модели, которые требуют апгрейда плана (например, perplexity online, gpt-5-nano),
+  // исключены из baseline — авто-сканер может добавить их, если они станут доступны.
+  const BASELINE_ORCHESTRATOR_MODELS = [
+    // 0.015–0.075₽/1K — топ-дешёвые сильные кодеры
+    { id: 'openai/gpt-4.1-nano',             tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
+    { id: 'openai/gpt-oss-20b',              tier: 'mid',   coding: true,  vision: false, prompt: 0.014, completion: 0.06  },
+    { id: 'openai/gpt-oss-120b',             tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.065 },
+    { id: 'google/gemini-2.5-flash-lite',    tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
+    { id: 'google/gemini-2.5-flash-pre',     tier: 'mid',   coding: true,  vision: false, prompt: 0.018, completion: 0.07  },
+    { id: 'qwen/qwen3-32b',                 tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.055 },
+    { id: 'openai/gpt-oss-120b-fast',        tier: 'mid',   coding: true,  vision: false, prompt: 0.021, completion: 0.085 },
+    { id: 'meta-llama/llama-4-scout',        tier: 'mid',   coding: true,  vision: false, prompt: 0.022, completion: 0.08  },
+    // 0.09–0.12₽/1K — более мощные, но всё ещё в бюджете на 1–2 модели
+    { id: 'deepseek/deepseek-v4-flash',      tier: 'mid',   coding: true,  vision: false, prompt: 0.036, completion: 0.072 },
+    { id: 'deepseek/deepseek-v4-flash-thinking', tier: 'mid', coding: true, vision: false, prompt: 0.036, completion: 0.072 },
+    { id: 'deepseek/deepseek-v4-flash-alt',   tier: 'mid',   coding: true,  vision: false, prompt: 0.04,  completion: 0.08  },
+    { id: 'qwen/qwen3-coder-next',           tier: 'mid',   coding: true,  vision: false, prompt: 0.022, completion: 0.12  },
+    // Vision-модели исключены из baseline — на базовом тарифе VseGPT они требуют upgrade.
+    // Если пользователь апгрейдит план, авто-сканер подтянет их из /api/models.
   ];
+  // Активный ростер. Инициализируется baseline, потом обновляется через /api/models.
+  let ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
+
+  // Авто-сканер каталога VseGPT. Загружает /api/models (бесплатно), фильтрует
+  // новые дешёвые сильные текстовые модели, добавляет в ростер, удаляет исчезнувшие.
+  // Защищён от мультимодальных и embedding-моделей.
+  function refreshOrchestratorModels(catalog) {
+    if (!Array.isArray(catalog)) return;
+    const textProviders = /^(openai|google|qwen|deepseek|meta-llama|mistralai|anthropic|perplexity|vis-openai|vis-google|vis-meta-llama|vis-qwen|vis-anthropic|amazon|cohere|xai|moonshotai|minimax|xiaomi)/i;
+    const bannedPrefixes = ['emb-', 'img-', 'img2', 'txt2', 'tta-', 'tts-', 'stt-', 'utils/', 'text-embedding'];
+    const strongFamilies = ['coder', 'code', 'flash', 'nano', 'mini', 'maverick', 'scout', 'sonnet', 'opus', 'reasoner', 'r1', 'large-online', 'small-online', 'vision', 'vl'];
+    const scored = catalog
+      .filter(m => {
+        const id = m.id || '';
+        if (!textProviders.test(id)) return false;
+        if (bannedPrefixes.some(p => id.toLowerCase().startsWith(p))) return false;
+        const p = parseFloat(m.pricing?.prompt || 0);
+        const c = parseFloat(m.pricing?.completion || 0);
+        return p + c <= 0.25; // дешевле 0.25₽/1K
+      })
+      .map(m => {
+        const id = m.id;
+        const p = parseFloat(m.pricing?.prompt || 0);
+        const c = parseFloat(m.pricing?.completion || 0);
+        const feats = m.features || [];
+        const hasVision = feats.includes('vision');
+        const isCoding = /(coder|code|flash|nano|mini|maverick|scout|sonnet|opus|reasoner|r1)/i.test(id) || feats.includes('tools') || feats.includes('structured');
+        const familyScore = strongFamilies.reduce((s, f) => s + (id.toLowerCase().includes(f) ? 1 : 0), 0);
+        const score = (isCoding ? 3 : 0) + (hasVision ? 1 : 0) + familyScore - (p + c) * 2;
+        return { id, prompt: p, completion: c, vision: hasVision, coding: isCoding, tier: 'mid', score };
+      })
+      .sort((a, b) => b.score - a.score);
+    // Сохраняем baseline-модели наверху, добавляем новые уникальные.
+    const baselineIds = new Set(BASELINE_ORCHESTRATOR_MODELS.map(m => m.id));
+    const newOnes = scored.filter(m => !baselineIds.has(m.id)).slice(0, 12);
+    // Убираем исчезнувшие из baseline, но не трогаем baseline-модели даже если их нет в каталоге
+    // (они могли быть временно скрыты). Авто-добавленные удаляем, если их нет в каталоге.
+    const catalogIds = new Set(catalog.map(m => m.id));
+    const kept = ORCHESTRATOR_MODELS.filter(m => {
+      if (baselineIds.has(m.id)) return true; // baseline всегда сохраняем
+      return catalogIds.has(m.id); // авто-модели только если есть в каталоге
+    });
+    // Обновляем цены у всех моделей по актуальному каталогу.
+    for (const m of kept) {
+      const cat = catalog.find(c => c.id === m.id);
+      if (cat && cat.pricing) {
+        m.prompt = parseFloat(cat.pricing.prompt || 0);
+        m.completion = parseFloat(cat.pricing.completion || 0);
+      }
+    }
+    ORCHESTRATOR_MODELS = kept.concat(newOnes);
+    console.log('[orchestrator] ростер обновлён:', ORCHESTRATOR_MODELS.length, 'моделей. Новых:', newOnes.length);
+  }
+
+  function estimateCost(modelId, promptTokens, completionTokens) {
+    const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
+    if (!m) return Infinity;
+    return ((m.prompt || 0) * promptTokens + (m.completion || 0) * completionTokens) / 1000;
+  }
+
+  // Подбирает 2–3 модели под бюджет. Сначала coding-модели, vision при необходимости.
+  function pickModelsUnderBudget(hasImage, budgetRub = BUDGET_RUB, minCount = 2, maxCount = 3) {
+    const candidates = ORCHESTRATOR_MODELS.filter(m => isAvailableModel(m.id))
+      .filter(m => hasImage ? m.vision : true)
+      .filter(m => m.coding)
+      .slice(); // копия
+    // Предполагаем: prompt ~1500 ток, completion ~1500 ток на старте; потом подгоним max_tokens.
+    const assumedPrompt = 1500;
+    const assumedCompletion = 1500;
+    const picked = [];
+    let spent = 0;
+    for (const m of candidates) {
+      const cost = estimateCost(m.id, assumedPrompt, assumedCompletion);
+      if (picked.length >= maxCount) break;
+      if (picked.length >= minCount && spent + cost > budgetRub) break;
+      if (picked.length < minCount || spent + cost <= budgetRub) {
+        picked.push(m.id);
+        spent += cost;
+      }
+    }
+    // Если ничего не выбрали — возвращаем самую дешёвую подходящую.
+    if (!picked.length && candidates.length) picked.push(candidates[0].id);
+    return picked;
+  }
+
+  // Вычисляет max_tokens для каждой модели в multi-режиме, чтобы общий completion-расход
+  // не превысил оставшийся бюджет. Предполагаем prompt фиксированным.
+  function allocateMaxTokens(modelIds, budgetRub = BUDGET_RUB, promptTokens = 1500) {
+    const remaining = budgetRub - modelIds.reduce((sum, id) => sum + estimateCost(id, promptTokens, 0), 0);
+    if (remaining <= 0) return modelIds.map(() => 256);
+    // Распределяем бюджет на completion пропорционально цене completion.
+    const rates = modelIds.map(id => {
+      const m = ORCHESTRATOR_MODELS.find(x => x.id === id);
+      return m && m.completion > 0 ? 1 / m.completion : 1;
+    });
+    const totalRate = rates.reduce((a, b) => a + b, 0);
+    const tokens = modelIds.map((id, i) => {
+      const m = ORCHESTRATOR_MODELS.find(x => x.id === id);
+      const share = rates[i] / totalRate;
+      const completionBudget = remaining * share;
+      return Math.max(256, Math.min(4096, Math.floor(completionBudget / (m.completion || 0.001) * 1000)));
+    });
+    return tokens;
+  }
 
   function orchestratorPrompt(mode) {
     const list = ORCHESTRATOR_MODELS.map(m => {
@@ -1454,18 +1602,19 @@
       'Правила:',
       '- "direct" ТОЛЬКО для чистого Q&A без кода: приветствие, перевод одной фразы, математика в одно действие, общий факт. Поле answer содержит КРАТКИЙ ответ.',
       '- Любая задача про СОЗДАТЬ / ИЗМЕНИТЬ / УДАЛИТЬ / ОТЛАДИТЬ / ОБЪЯСНИТЬ код/UI/файл/страницу — ОБЯЗАТЕЛЬНО delegate или multi.',
-      '- Если в задаче картинка (vision) — выбирай модель с меткой vision·image (первый приоритет: vis-openai/gpt-5-nano).',
+      '- Если в задаче картинка (vision) — выбирай доступную модель с меткой vision·image. Если таких нет в ростере — используй лучшую coding-модель по описанию.',
       '- Для современных веб-приложений/лендингов/mini-app — предпочитай gpt-oss-120b, qwen3-coder-next или gemini-2.5-flash-lite.',
       '- Для алгоритмов, math — qwen3-coder-next.',
       '- Для быстрых/мелких задач — gpt-4.1-nano или gemini-2.5-flash-lite.',
       '- При нулевом балансе — perplexity/latest-large-online (0₽, GPT-4 class, веб-поиск) или perplexity/latest-small-online (0₽, быстрый).',
       '- Если задача содержит «[🎯 ЦЕЛЬ ОПЕРАЦИИ]» или «⌖ <tag>» — это указатель на конкретный файл. Игнорировать нельзя.',
+      '- ЖЁСТКИЙ БЮДЖЕТ: один запрос должен уложиться в 0.2₽. Для multi выбирай 2–3 модели так, чтобы сумма prompt+completion на ~1500 токенов не превысила 0.2₽.',
       '',
       'ВАЖНО: платформа заточена под разработку современных веб-приложений (React, Next.js, лендинги, дашборды). По умолчанию delegate или multi. Direct — только для чистого Q&A без кода.',
       '',
       mode === 'multi'
-        ? 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 2–3 id (один с coding, один с vision если есть картинка).'
-        : 'Верни ОДИН JSON-объект: {"action":"delegate","model":"<id>"} — выбери id с coding/vision под задачу.',
+        ? 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 2–3 id (один с coding, один с vision если есть картинка). Сумма цен на 1500 prompt + 1500 completion ≤ 0.2₽.'
+        : 'Верни ОДИН JSON-объект: {"action":"delegate","model":"<id>"} — выбери самую дешёвую сильную модель с coding/vision под задачу (≤0.2₽ на 1500+1500 токенов).',
       '',
       'Без prose. Без тройных бэктиков. Без пояснений. Без "Мы видим, что...". Один JSON от первого до последнего символа.',
       '',
@@ -1474,11 +1623,11 @@
     ].join('\n');
   }
 
-  async function callOpenAI(model, messages) {
+  async function callOpenAI(model, messages, maxTokens = 8192) {
     const resp = await fetch('/api/chat/openai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, max_tokens: 8192 })
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens })
     });
     if (!resp.ok) {
       let detail = '';
@@ -1536,12 +1685,11 @@
     const pickVision = (id, preferCoding) => {
       if (!hasImageAttachment) return id;
       const cur = ORCHESTRATOR_MODELS.find(m => m.id === id);
-      if (cur && cur.vision) return id;
-      // Берём САМУЮ СИЛЬНУЮ vision-модель из ростера (порядок = сила сверху-вниз),
-      // потому что картинки требуют понимания -> дешёвая haiku часто ошибается
-      // там, где Sonnet 4.6 / Opus правильно интерпретирует. Если preferCoding=true,
-      // сначала пробуем coding-вариант; если его нет — берём первый в ростере.
-      const candidates = ORCHESTRATOR_MODELS.filter(m => m.vision);
+      if (cur && cur.vision && isAvailableModel(cur.id)) return id;
+      // Берём САМУЮ СИЛЬНУЮ доступную vision-модель из ростера (порядок = сила сверху-вниз).
+      // Если доступных vision-моделей нет — оставляем текущую модель: текстовые модели
+      // справятся по описанию, а недоступная vision-модель только сломает запрос.
+      const candidates = ORCHESTRATOR_MODELS.filter(m => m.vision && isAvailableModel(m.id));
       const alt = (preferCoding ? candidates.find(m => m.coding) || candidates[0] : candidates[0]) || null;
       if (!alt || alt.id === id) return id;
       onStep && onStep('Замена делегата на vision-модель: ' + id + ' → ' + alt.id);
@@ -1647,10 +1795,11 @@
       }
       if (r.error) {
         onStep && onStep('Делегат ' + id + ': ' + r.error);
-        // Если ошибка «not available / upgrade plan» — идём по ростеру вниз
-        // и пробуем следующего coding/vision, пока не найдём доступного.
+        // Если ошибка «not available / upgrade plan» — заносим модель в чёрный список
+        // на сессию и идём по ростеру вниз, пока не найдём доступного.
         const isUnavailable = isBudgetOrModelError(r.error);
         if (isUnavailable) {
+          markUnavailable(id);
           const tried = new Set([id]);
           let fallbackId = null, fallbackResp = null;
           for (const m of ORCHESTRATOR_MODELS) {
@@ -1696,14 +1845,22 @@
       // Vision-эскалация перед фильтром — иначе для картинок уйдёт запрос к модели без vision.
       if (hasImageAttachment) ids = ids.map(id => pickVision(id, false));
       ids = ids.filter(id => ORCHESTRATOR_MODELS.find(m => m.id === id)).slice(0, 3);
+      // Если router не выбрал или выбрал неподходящее — берём под бюджет автоматически.
       if (!ids.length) {
-        const coding = ORCHESTRATOR_MODELS.filter(m => m.coding).slice(0, 3).map(m => m.id);
-        ids = coding.length ? coding : ['vis-openai/gpt-5-nano', 'openai/gpt-oss-120b', 'qwen/qwen3-coder-next'];
+        ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
       }
-      onStep && onStep('Параллельный опрос ' + ids.length + ' моделей…');
-      const results = await Promise.all(ids.map(async id => {
+      // Проверяем, что выбранные модели укладываются в бюджет; если нет — пересобираем.
+      const estimatedCost = ids.reduce((sum, id) => sum + estimateCost(id, 1500, 1500), 0);
+      if (estimatedCost > BUDGET_RUB) {
+        onStep && onStep('Router превысил бюджет 0.2₽ (' + estimatedCost.toFixed(2) + '₽) → пересобираю под бюджет');
+        ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
+      }
+      // Распределяем max_tokens под бюджет.
+      const maxTokensList = allocateMaxTokens(ids, BUDGET_RUB, 1500);
+      onStep && onStep('Параллельный опрос ' + ids.length + ' моделей (бюджет ≤0.2₽)…');
+      const results = await Promise.all(ids.map(async (id, idx) => {
         try {
-          const r = await callOpenAI(id, await delegateMessages(id));
+          const r = await callOpenAI(id, await delegateMessages(id), maxTokensList[idx]);
           if (r.error) return { id, error: r.error };
           return { id, text: r.text };
         } catch (err) {
@@ -1713,6 +1870,7 @@
       const ok = results.filter(r => r.text && !r.error);
       const failed = results.filter(r => r.error);
       if (failed.length) {
+        failed.forEach(f => { if (isBudgetOrModelError(f.error)) markUnavailable(f.id); });
         onStep && onStep('Часть моделей вернула ошибку: ' + failed.map(f => f.id + ' (' + f.error + ')').join(', '));
       }
       if (!ok.length) {
