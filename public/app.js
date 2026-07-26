@@ -22,7 +22,8 @@
   const scanBtn = document.getElementById('scanModels');
   const scanStatus = document.getElementById('scanStatus');
 
-  let currentModel = 'multi';
+  const DEFAULT_MODEL_KEY = 'direct:vis-meta-llama/llama-3.2-11b-vision-instruct';
+  let currentModel = DEFAULT_MODEL_KEY;
   let sending = false;
   let modelPresets = {};
   let config = { hasLocalLLM: false, llmModel: '', hasOpenAI: false, openaiBaseURL: '' };
@@ -114,98 +115,13 @@
       config = await r.json();
     } catch {}
 
-    // Загружаем курированный ростер (с сервера, scout-LLM ранжировала)
-    // и fallback на старый /api/models если scout-индекс ещё пуст.
-    async function scanModelCatalog() {
-      try {
-        let modelsData = null;
-        // 1) Приоритет — серверный scout (бесплатная LLM раз в час обновляет).
-        try {
-          const mr = await fetch('/api/scout-models');
-          if (mr.ok) {
-            const j = await mr.json();
-            if (j && Array.isArray(j.data) && j.data.length) modelsData = j.data;
-          }
-        } catch {}
-        // 2) Fallback — прямой /v1/models + клиентский heuristic.
-        if (!modelsData) {
-          try {
-            const mr2 = await fetch('/api/models');
-            if (mr2.ok) {
-              const j = await mr2.json();
-              if (j && Array.isArray(j.data)) modelsData = j.data;
-            }
-          } catch {}
-        }
-        if (modelsData && modelsData.length) {
-          // Серверный scout отдаёт наш нормализованный формат (id, prompt,
-          // completion, vision, coding, score). Тогда это source-of-truth:
-          // цены и состав ростера — с scout, который курирует каждый час.
-          // Если scout не отдал — fallback на /api/models (старый каталог
-          // OpenAI-shape), который мерджим с baseline как раньше.
-          const isScoutShape = modelsData[0] && ('prompt' in modelsData[0])
-            && !('pricing' in modelsData[0]);
-          if (isScoutShape) {
-            ORCHESTRATOR_MODELS = modelsData.map(m => ({
-              id: m.id,
-              prompt: m.prompt || 0,
-              completion: m.completion || 0,
-              vision: !!m.vision,
-              coding: !!m.coding,
-              score: m.score || 0,
-              tier: (m.vision && m.coding) ? 'vision' : (m.coding ? 'mid' : 'free'),
-            })).sort((a, b) => (b.score - a.score) || ((a.prompt + a.completion) - (b.prompt + b.completion)));
-            console.log('[orchestrator] ростер собран из scout:', ORCHESTRATOR_MODELS.length, 'моделей');
-          } else {
-            refreshOrchestratorModels(modelsData);
-          }
-          rebuildDirectModelPresets();
-          renderModelDropdown();
-          console.log('[models] дропдаун обновлён:', ORCHESTRATOR_MODELS.length);
-        }
-      } catch (e) { console.log('[models] авто-сканер не смог загрузить каталог:', e); }
-    }
-    if (config.hasOpenAI) {
-      await scanModelCatalog();
-      // Повторный скан каждый час — ловим новые дешёвые модели и убираем исчезнувшие.
-      if (!window.__modelScanInterval) {
-        window.__modelScanInterval = setInterval(scanModelCatalog, 60 * 60 * 1000); // мониторинг каждый час
-      }
-    }
+    // Статический ростер VseGPT: мульти-AI и авто-скан отключены для экономии.
+    ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
+    rebuildDirectModelPresets();
 
-    // Add local LLM preset if available
-    if (config.hasLocalLLM) {
-      modelPresets['local'] = {
-        name: 'Локально (сервер)', label: 'Локально', color: 'economy',
-        desc: `Серверная модель ${config.llmModel} — без ключей и без WebGPU`,
-        local: true
-      };
-    }
-    // Add OpenAI-compatible models (DeepSeek, OpenAI, OpenRouter…)
-    if (config.hasOpenAI) {
-      // ── Мульти AI — выбор 1–3 моделей для синтеза лучшего ответа (с бюджетным контролем).
-      modelPresets['multi'] = {
-        name: '⭐ Мульти AI', label: '⭐ Мульти AI', color: 'pro',
-        desc: 'Параллельно 1–3 модели + vision для скриншотов; синтез лучшего ответа',
-        openai: true,
-        apiModel: 'openai/gpt-4.1-nano',
-        router: 'multi',
-        featured: true
-      };
-      // Default — google/gemini-2.5-flash-lite как надёжный и дешёвый кодер.
-      // Если сохранённое значение — устаревший single-model дефолт
-      // или старые ключи (auto / orchestrator / openai-chat / featured-*),
-      // мигрируем в режим Мульти AI — пользователь явно попросил multi по умолчанию.
-      if (
-        currentModel === 'auto' ||
-        currentModel === 'orchestrator' ||
-        currentModel === 'openai-chat' ||
-        currentModel === 'deepseek-reasoner' ||
-        currentModel === 'direct:google/gemini-2.5-flash-lite' ||
-        currentModel.startsWith('featured-')
-      ) {
-        currentModel = 'multi';
-      }
+    // Если текущая модель не из ростера — переключаем на дешёвую vision по умолчанию.
+    if (!modelPresets[currentModel]) {
+      currentModel = DEFAULT_MODEL_KEY;
     }
 
     renderModelDropdown();
@@ -892,7 +808,7 @@
   }
 
   function updateModelDisplay() {
-    const p = modelPresets[currentModel] || modelPresets['direct:google/gemini-2.5-flash-lite'] || { label: 'gemini-2.5-flash-lite', color: 'standard', desc: 'Выбранная модель' };
+    const p = modelPresets[currentModel] || modelPresets[DEFAULT_MODEL_KEY] || { label: 'gemini-2.5-flash-lite', color: 'standard', desc: 'Выбранная модель' };
     const color = colorMap[p.color] || colorMap.auto;
     modelLabel.textContent = p.label;
     modelDot.style.background = color;
@@ -1542,29 +1458,16 @@
   //   reasoning-> пошаговое планирование.
   // Ordered by cost (ascending) — router prefers cheapest model that can handle the task.
   // Falls back up the list on budget/availability errors (isBudgetOrModelError).
-  // Бюджет на один запрос (руб). Жёсткий лимит: один запрос не дороже 0.07₽.
-  const BUDGET_RUB = 0.07;
+  // Бюджет на один запрос (руб). Жёсткий лимит: один запрос не дороже 0.06₽.
+  const BUDGET_RUB = 0.06;
   // Цены prompt/completion в ₽ за 1000 токенов — актуальны для VseGPT.ru.
-  // Список урезан: только дешёвые и эффективные модели для кода/UI/vision.
-  // Мульти-AI отключён — оркестратор выбирает ОДНУ модель под задачу.
+  // Статический ростер: только дешёвые vision-модели для кода/UI/скриншотов.
+  // Мульти-AI отключён.
   const BASELINE_ORCHESTRATOR_MODELS = [
-    // ── Сверхдёшевые кодеры (выбор по умолчанию для экономии)
-    { id: 'amazon/nova-micro-v1',                         tier: 'cheap',  coding: true,  vision: false, prompt: 0.012, completion: 0.03  },
-    { id: 'cohere/command-r7b-12-2024',                   tier: 'cheap',  coding: true,  vision: false, prompt: 0.01,  completion: 0.025 },
-    { id: 'qwen/qwen3-14b',                               tier: 'cheap',  coding: true,  vision: false, prompt: 0.012, completion: 0.033 },
-    // ── Рабочие лошадки для UI/лендингов/mini-app
-    { id: 'openai/gpt-4.1-nano',                          tier: 'mid',    coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
-    { id: 'google/gemini-2.5-flash-lite',                 tier: 'mid',    coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
-    { id: 'mistralai/devstral-small',                     tier: 'mid',    coding: true,  vision: false, prompt: 0.015, completion: 0.045 },
-    // ── Мощные кодеры (используются только для сложных задач, дороже)
-    { id: 'deepseek/deepseek-coder',                      tier: 'strong', coding: true,  vision: false, prompt: 0.04,  completion: 0.05  },
-    { id: 'qwen/qwen-2.5-coder-32b-instruct',             tier: 'strong', coding: true,  vision: false, prompt: 0.05,  completion: 0.05  },
-    // ── Vision — для скриншотов и картинок (используются только когда есть изображение)
-    { id: 'vis-openai/gpt-5-nano',                        tier: 'vision', coding: true,  vision: true,  prompt: 0.015, completion: 0.12  },
-    { id: 'vis-meta-llama/llama-3.2-11b-vision-instruct', tier: 'vision', coding: false, vision: true,  prompt: 0.055, completion: 0.055 },
-    // ── Бесплатные (0₽) — только для веб-поиска/фактов, не для генерации кода
-    { id: 'perplexity/latest-small-online',               tier: 'free',   coding: false, vision: false, prompt: 0,     completion: 0     },
-    { id: 'perplexity/latest-large-online',               tier: 'free',   coding: false, vision: false, prompt: 0,     completion: 0     },
+    { id: 'vis-meta-llama/llama-3.2-11b-vision-instruct', tier: 'vision', coding: true, vision: true, prompt: 0.055, completion: 0.055, name: 'V0 — Llama 3.2 11B Vision', desc: 'Самый дешёвый vision: UI по скриншоту / макету' },
+    { id: 'vis-openai/gpt-4o-mini',                       tier: 'vision', coding: true, vision: true, prompt: 0.037, completion: 0.15,  name: 'Copilot — GPT-4o mini',      desc: 'OpenAI vision + кодинг — аналог GitHub Copilot' },
+    { id: 'vis-meta-llama/llama-4-scout',                 tier: 'vision', coding: true, vision: true, prompt: 0.05,  completion: 0.16,  name: 'Replit Agent — Llama 4 Scout', desc: 'Быстрый open-source vision-кодер с tools' },
+    { id: 'vis-anthropic/claude-3-haiku',                 tier: 'vision', coding: true, vision: true, prompt: 0.066, completion: 0.30,  name: 'Claude 3 Haiku Vision',      desc: 'Антропик vision — аналог Claude' },
   ];
   // Активный ростер. Инициализируется baseline, потом обновляется через /api/models.
   let ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
@@ -1634,10 +1537,12 @@
       const cost = ((m.prompt || 0) + (m.completion || 0)).toFixed(3);
       const shortName = m.id.includes('/') ? m.id.split('/')[1] : m.id;
       const provider = m.id.includes('/') ? m.id.split('/')[0] : '';
+      const defaultDesc = (m.vision ? '👁 ' : '') + (m.coding ? '💻 ' : '') + provider + (m.prompt === 0 ? ' · бесплатно' : ' · ~' + cost + '₽/1K');
+      const label = m.name || shortName;
       modelPresets[key] = {
-        name: shortName, label: shortName,
+        name: label, label: label,
         color: m.vision ? 'pro' : (m.prompt === 0 ? 'economy' : 'standard'),
-        desc: (m.vision ? '👁 ' : '') + (m.coding ? '💻 ' : '') + provider + (m.prompt === 0 ? ' · бесплатно' : ' · ~' + cost + '₽/1K'),
+        desc: m.desc || defaultDesc,
         openai: true,
         apiModel: m.id,
         directVision: m.vision
@@ -2244,7 +2149,7 @@
       window.__clearPendingAttachments && window.__clearPendingAttachments();
     }
 
-    const selectedPreset = modelPresets[currentModel] || modelPresets['direct:google/gemini-2.5-flash-lite'] || { name: 'gemini-2.5-flash-lite' };
+    const selectedPreset = modelPresets[currentModel] || modelPresets[DEFAULT_MODEL_KEY] || { name: 'gemini-2.5-flash-lite' };
 
     // DeepSeek / local LLM работают без WebGPU
     const isApiModel = selectedPreset.openai || selectedPreset.local;
@@ -2412,41 +2317,42 @@
             }
             // Шапку возвращаем в нормальное AUTO-состояние (модель только что
             // поработала, теперь снова ждёт следующего запроса).
-            try { setActiveModel('direct:google/gemini-2.5-flash-lite', 'gemini-2.5-flash-lite'); } catch (_) {}
+            try { setActiveModel(DEFAULT_MODEL_KEY, 'V0 — Llama 3.2 11B Vision'); } catch (_) {}
           } else {
             // ── Прямой SSE-стрим к выбранной модели ────────────────
-            // Шлём реальный id модели у провайдера (deepseek-chat / deepseek-reasoner),
-            // а не UI-ключ (openai-chat / deepseek-reasoner) — иначе upstream вернёт model-not-found.
+            // Шлём реальный id модели у провайдера, а не UI-ключ — иначе upstream вернёт model-not-found.
             const apiModel = selectedPreset.apiModel || currentModel;
-          const contextMessages = await buildWorkspaceContextMessages();
+            const contextMessages = await buildWorkspaceContextMessages();
+            const messages = [
+              { role: 'system', content: COMPACT_SYSTEM_PROMPT },
+              ...contextMessages,
+              ...await Promise.all(history.slice(-3).map(async (m, i, arr) => {
+                const last = i === arr.length - 1 && m.role === 'user';
+                // Только текущее сообщение отправляем с картинками;
+                // исторические картинки заменяем на текстовое описание,
+                // иначе контекст раздувается до 5+ ₽ за запрос.
+                // directVision:false → модель без vision, не отправляем image_url.
+                const wantsImages = selectedPreset.directVision !== false;
+                const atts = (last && attachments.length && wantsImages) ? attachments : [];
+                const content = atts.length
+                  ? await attachImagesToUser(m.content, atts)
+                  : ((m.role === 'user' && m.attachments && m.attachments.length)
+                      ? (m.content || '') + '\n\n[Прикреплено ' + m.attachments.length + ' изображение: ' + m.attachments.map(a => a.name || a.path).join(', ') + ']'
+                      : m.content);
+                return { role: m.role, content };
+              }))
+            ];
+            const safeMaxTokens = budgetedMaxTokens(apiModel, messages, 700);
             const resp = await fetch('/api/chat/openai', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: apiModel,
-              messages: [
-                 { role: 'system', content: COMPACT_SYSTEM_PROMPT },
-                ...contextMessages,
-                ...await Promise.all(history.slice(-3).map(async (m, i, arr) => {
-                  const last = i === arr.length - 1 && m.role === 'user';
-                  // Только текущее сообщение отправляем с картинками;
-                  // исторические картинки заменяем на текстовое описание,
-                  // иначе контекст раздувается до 5+ ₽ за запрос.
-                  // directVision:false → модель без vision, не отправляем image_url.
-                  const wantsImages = selectedPreset.directVision !== false;
-                  const atts = (last && attachments.length && wantsImages) ? attachments : [];
-                  const content = atts.length
-                    ? await attachImagesToUser(m.content, atts)
-                    : ((m.role === 'user' && m.attachments && m.attachments.length)
-                        ? (m.content || '') + '\n\n[Прикреплено ' + m.attachments.length + ' изображение: ' + m.attachments.map(a => a.name || a.path).join(', ') + ']'
-                        : m.content);
-                  return { role: m.role, content };
-                }))
-              ],
-              max_tokens: 700
-            }),
-            signal: chatAbort ? chatAbort.signal : undefined
-          });
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: apiModel,
+                messages,
+                max_tokens: safeMaxTokens
+              }),
+              signal: chatAbort ? chatAbort.signal : undefined
+            });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const reader = resp.body.getReader();
           const decoder = new TextDecoder();

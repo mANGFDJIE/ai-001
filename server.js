@@ -790,7 +790,7 @@ function defaultIndexHtml() {
 // Кандидаты со score ≥ 6 сохраняются в workspace/state/roster.json с timestamp.
 // Клиент берёт через GET /api/scout-models — там есть ageMs, refreshing, model.
 // Если scout-LM не отвечает — fallback на heuristic-only фильтр (без score).
-const SCOUT_MODEL = process.env.SCOUT_MODEL || 'perplexity/latest-small-online';
+const SCOUT_MODEL = process.env.SCOUT_MODEL || ''; // авто-скан отключён по умолчанию для экономии
 const ROSTER_PATH = path.join(__dirname, 'workspace', 'state', 'roster.json');
 const SCOUT_CACHE_MS = 60 * 60 * 1000;
 
@@ -847,6 +847,7 @@ async function llmComplete(messages, opts) {
 }
 
 async function refreshScout() {
+  if (!SCOUT_MODEL) return; // авто-скан отключён
   if (!process.env.OPENAI_API_KEY && !process.env.VSEGPTRU) return;
   try {
     const cat = await fetchProviderCatalog();
@@ -952,15 +953,18 @@ app.get('/api/scout-models', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Cold-start через 3 секунды (не блокирует listen) + hourly unref-таймер.
-setTimeout(() => { refreshScout().catch(() => {}); }, 3000);
-const scoutTimer = setInterval(() => { refreshScout().catch(() => {}); }, SCOUT_CACHE_MS);
-if (scoutTimer.unref) scoutTimer.unref();
+// Cold-start + hourly авто-скан отключены по умолчанию (SCOUT_MODEL пуст).
+// Чтобы включить обратно — выставьте SCOUT_MODEL в Replit Secrets.
+if (SCOUT_MODEL) {
+  setTimeout(() => { refreshScout().catch(() => {}); }, 3000);
+  const scoutTimer = setInterval(() => { refreshScout().catch(() => {}); }, SCOUT_CACHE_MS);
+  if (scoutTimer.unref) scoutTimer.unref();
+}
 
 app.listen(PORT, '0.0.0.0', () => {
   const hasOpenAI = !!(process.env.OPENAI_API_KEY || process.env.VSEGPTRU);
   const openaiBaseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');
   const provider = openaiBaseURL.includes('vsegpt.ru') ? 'vsegpt.ru' : openaiBaseURL;
   console.log(`Сервер запущен на порту ${PORT}`);
-  console.log(`[openai] provider=${provider} key=${hasOpenAI ? 'set' : 'missing'} default_model=deepseek-chat`);
+  console.log(`[openai] provider=${provider} key=${hasOpenAI ? 'set' : 'missing'} roster=static`);
 });

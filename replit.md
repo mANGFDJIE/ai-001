@@ -14,45 +14,38 @@
 
 ## Проект
 
-# Agent UI (локальные + API модели)
+# Agent UI (VseGPT)
 
-AI-агент с чатом на **трёх провайдерах**: WebLLM (браузер, WebGPU), локальный сервер (Transformers.js, CPU), и OpenAI-совместимые API (DeepSeek, OpenAI, OpenRouter). Никаких платных подписок — модели под ваш сценарий.
+AI-агент с чатом, подключённый к **VseGPT.ru** (OpenAI-совместимый API). Все выбранные модели — vision: умеют видеть картинки и генерировать код/вёрстку.
 
 ## Стек
 
-- **Backend:** Node.js + Express (`server.js`), порт 5000 — прокси API, файлы агента, конфиг
+- **Backend:** Node.js + Express (`server.js`), порт 5000 — прокси к VseGPT, файлы агента, конфиг
 - **Frontend:** Vanilla HTML/CSS/JS в `public/`
-- **LLM провайдеры:**
-  - [WebLLM](https://github.com/mlc-ai/web-llm) — 29 open-source моделей в браузере (нужен WebGPU)
-  - Transformers.js — серверный CPU-инференс (без WebGPU)
-  - OpenAI-совместимый прокси — DeepSeek / GPT / OpenRouter
+- **LLM провайдер:** VseGPT (`https://api.vsegpt.ru/v1`) — OpenAI-совместимый API
 - **Sync слой:** Supabase Postgres (опционально)
 - **Локальный fallback:** `localStorage` + `workspace/preview/`
 
 ## Запуск
 
-1. **Один раз в Supabase SQL Editor:** открыть https://supabase.com/dashboard/project/fcmnytratjicextoywyc/sql, вставить содержимое `supabase/schema.sql`, нажать **Run**. Создастся 4 таблицы с RLS.
-2. Локально: `npm install` + `npm start` (или воркфлоу «Start application»).
-3. Откройте URL в **Chrome 113+ или Edge 113+** — модели требуют WebGPU.
+1. Локально: `npm install` + `npm start` (или воркфлоу «Start application»).
+2. Откройте URL в браузере.
 
-Если Supabase не настроен, всё работает локально (только в браузере). Sync слой автоматически включается, когда сервер видит необходимые переменные окружения.
+Если Supabase не настроен, всё работает локально. Sync слой автоматически включается, когда сервер видит необходимые переменные окружения.
 
-> **Важно:** секреты (`SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_URL`) должны храниться только в **Replit Secrets**, а не в файлах проекта. В `.replit` они не должны быть указаны.
+> **Важно:** секреты (`SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_URL`, `OPENAI_API_KEY`) должны храниться только в **Replit Secrets**, а не в файлах проекта. В `.replit` они не должны быть указаны.
 
 ## Переменные окружения
 
 | Переменная | Нужна | Зачем |
 |---|---|---|
 | `SESSION_SECRET` | да (установлена) | зарезервировано |
-| `OPENAI_API_KEY` | да (установлен) | ключ vsegpt.ru / OpenAI-совместимого провайдера |
+| `OPENAI_API_KEY` | да (установлен) | ключ vsegpt.ru |
 | `VSEGPTRU` | fallback | ключ vsegpt.ru на случай пустого `OPENAI_API_KEY` |
 | `OPENAI_BASE_URL` | опционально | базовый URL провайдера; по умолчанию `https://api.vsegpt.ru/v1` |
 | `SUPABASE_URL` | для sync | URL проекта Supabase |
 | `SUPABASE_ANON_KEY` | для client config | публичный anon-ключ, если он нужен клиенту |
 | `SUPABASE_SERVICE_KEY` | для server sync | серверный ключ хранится только в Replit Secrets |
-| ~~`OPENROUTER_API_KEY`~~ | нет | больше не нужна |
-| ~~`GROQ_API_KEY`~~ | нет | больше не нужна |
-| ~~`OLLAMA_HOST`~~ | нет | больше не нужна |
 
 Supabase не включается автоматически из файлов проекта. Для синхронизации добавьте значения через Replit Secrets; без них используется локальное хранилище.
 
@@ -76,54 +69,19 @@ Sync идёт через **серверный proxy** (`/api/sync/*` в `server.
 
 **Почему это не автоматизировано из бота:** прямой TCP к Postgres (порт 5432) закрыт фаерволом Replit-песочницы; pooler `aws-0-*.pooler.supabase.com:6543` вашего проекта не резолвится DNS из песочницы; Management API `api.supabase.com/v1/projects/{ref}/database/query` принимает только Personal Access Token (PAT), не service_role. Никакого секрета от JWT-ключей у меня нет — только пароль БД из вашего дашборда.
 
-## Каталог моделей — 29 штук
+## Модели — статический ростер VseGPT
 
-Все модели имеют **открытые веса** (Apache 2.0 / MIT / Qwen License / Llama Community License) и опубликованы MLC-AI в формате для браузера.
+С 26 июля 2026 ростер моделей **захардкожен** в `public/app.js`. Серверный авто-скан `/v1/models` отключён, чтобы не тратить кредиты на периодические запросы к API.
 
-### Reasoning / DeepSeek-R1 (дистилляции)
+Мульти-AI отключён — выбранная модель отвечает напрямую.
 
-| Модель | Размер |
-|---|---|
-| DeepSeek-R1-Distill-Qwen-32B | ~17 ГБ |
-| DeepSeek-R1-Distill-Qwen-14B | ~9 ГБ |
-| DeepSeek-R1-Distill-Llama-8B | ~5 ГБ |
+| Модель | ID | Цена за 1K (prompt / completion) | Назначение |
+|---|---|---|---|
+| **V0 — Llama 3.2 11B Vision** | `vis-meta-llama/llama-3.2-11b-vision-instruct` | 0.055₽ / 0.055₽ | UI по скриншоту / макету |
+| **Copilot — GPT-4o mini** | `vis-openai/gpt-4o-mini` | 0.037₽ / 0.15₽ | OpenAI coding assistant |
+| **Replit Agent — Llama 4 Scout** | `vis-meta-llama/llama-4-scout` | 0.05₽ / 0.16₽ | быстрый open-source vision-кодер |
+| **Claude 3 Haiku Vision** | `vis-anthropic/claude-3-haiku` | 0.066₽ / 0.30₽ | аналог Claude |
 
-### Универсалы нового поколения
+Все модели — **vision**: умеют видеть картинки и генерировать код/вёрстку.
 
-| Модель | Размер | Год |
-|---|---|---|
-| **Qwen3.5 9B** / 4B | 2.8–5.5 ГБ | Apr 2026 |
-| Qwen3 32B / 14B / 8B / 4B / 1.7B | 1.3–18 ГБ | 2025 |
-| Llama 3.1 8B / 3.2 3B / 3.2 1B | 0.9–5 ГБ | Meta |
-| Gemma 3 12B / 4B | 2.8–7.5 ГБ | Google 2025 |
-| Mistral 7B v0.3 / Ministral 3B | 2.2–4.5 ГБ | Mistral AI
-
-## Модели — авто-курирование (с 26 июля 2026)
-
-Ростер моделей больше **НЕ захардкожен в `public/app.js`**. Сервер `server.js` раз в час опрашивает `GET /v1/models` провайдера и двухуровнево ранжирует кандидатов под наш сценарий:
-
-1. **Детерминированный ранг (0₽, канонично):** vision + coding сигналы + бонус за бесплатные/дешёвые модели (≤0.015₽/1K), штраф за дорогие. Без внешних вызовов, не падает на soft-limit.
-2. **Опциональный LM-скор сверху (только если pre-flight ≤0.05₽):** короткий запрос к `perplexity/latest-small-online`. Если upstream поднимает «soft user limit» (≥0.07₽/query) или pre-flight показал, что запрос дороже 0.05₽ — LM-шаг скипается, остаёмся на детерминированной разметке.
-
-Фильтр **до** ранжирования: prompt+completion ≤ 0.06₽/1K (`BUDGET_RUB`-1¢ запас на retry), пропускаем embedding/img2/tts/embedding префиксы. Отбрасываем модели со score < 6. Курированный ростер сохраняется в `workspace/state/roster.json` с timestamp; клиент берёт свежий список через `GET /api/scout-models` без перезапуска сервера.
-
-### Claude-аналоги (vision+coder)
-
-Список закреплён на сервере (`CLAUDE_ANALOGS_FALLBACK` в `server.js`) — каждый модель покрывает тот же класс задач, что Claude: чтение скриншота → построение страницы 1:1, сложный UI/лендинг/TMA:
-
-- `anthropic/claude-3-5-sonnet-20241022`, `claude-3-5-sonnet-20240620`, `claude-3-haiku-20240307`
-- `openai/gpt-4o`, `openai/gpt-4o-mini`
-- `google/gemini-2.5-flash-pre`, `gemini-2.5-flash`
-- `mistralai/pixtral-12b-2409`, `qwen/qwen-2.5-vl-72b-instruct`, `meta-llama/llama-3.2-90b-vision-instruct`, `xai/grok-2-vision-1212`
-
-Аналоги **пинятся в финальный ростер всегда**, независимо от того, возвращает ли провайдер их в `/v1/models` в этом часу. Если id уже есть в катастрофе — он просто склеится с актуальной ценой; если нет — добавляется с заявленной ценой (≤0.06₽/1K).
-
-Endpoint:
-- `GET /api/scout-models` → `{ data, cached, refreshing, ageMs, model }`
-- Холодный кеш → `202 { refreshing: true }` и асинхронный прогрев.
-- Hourly cron (`setInterval(refreshScout, 60min)` — `.unref()`).
-- Клиент: основной путь `/api/scout-models`; fallback `/api/models` (старый regex-heuristic) сохраняется на случай, если серверный scout ещё не прогрелся.
-
-Сценарий:
-- «Хочу дешёвую модель под каждую задачу» — топ ростера по score (score=9 → vision+coder одного класса с Claude).
-- «Хочу модель, которая читает картинку → делает страницу 1:1» — vision-фильтр из топ-5 ростера. |
+Бюджет на один запрос: **0.06₽** (`BUDGET_RUB` в `public/app.js`). Для сложной генерации страниц по картинке может понадобиться поднять лимит в настройках VseGPT.
