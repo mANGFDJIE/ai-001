@@ -1,38 +1,21 @@
-<!DOCTYPE html>
+<!-- откат изменений в app/layout.tsx, обратно к исходным настройкам -->
 <html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Услуги рядом</title>
-  <link rel="stylesheet" href="styles.css"/>
-</head>
-<body>
-  <header class="header">
-    <h1>Услуги рядом</h1>
-  </header>
-  <main class="cards-container">
-    <div class="card">
-      <h2>Ремонт</h2>
-      <p>Предложения по ремонту рядом с вами</p>
-    </div>
-    <div class="card">
-      <h2>Установка</h2>
-      <p>Мастера по монтажу рядом с вами</p>
-    </div>
-    <div class="card">
-      <h2>Уборка</h2>
-      <p>Профессиональные услуги по уборке</p>
-    </div>
-    <div class="card">
-      <h2>Обучение</h2>
-      <p>Курсы и мастерклассы поблизости</p>
-    </div>
-  </main>
-  <nav class="bottom-nav">
-    <button class="nav-btn active">Главное</button>
-    <button class="nav-btn">Каталог</button>
-    <button class="nav-btn">Профиль</button>
-  </nav>
-  <script src="script.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Приложение</title>
+    <link rel="stylesheet" href="/app/globals.css" />
+  </head>
+  <body>
+    <header>
+      <nav>
+        <ul>
+          <li><a href="/">Главная</a></li>
+          <li><a href="/ai">ИИ</a></li>
+        </ul>
+      </nav>
+    </header>
+    <main>
+      <Outlet />
+    </main>
+  </body>
 </html>

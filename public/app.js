@@ -1944,25 +1944,43 @@
     } catch (e) {
       console.warn('[orchestrator] pre-write failed:', e);
     }
+    // Если в multi-опросе выжил только один делегат — синтез не нужен,
+    // экономим запрос и не мнём успешный ответ через дорогой round-trip.
+    if (ok.length === 1) {
+      onStep && onStep('Один делегат успешен → отдаю его ответ напрямую (без синтеза)');
+      return { text: ok[0].text, model: ok[0].id };
+    }
     const rawBlocks = ok.map(r => '### ' + r.id + '\n' + r.text).join('\n\n---\n\n');
-    // VseGPT делает soft pre-flight по (prompt + max_completion). Урезаем блоки
-    // агрессивнее (≈1.8K символов ≈ 450 токенов), потому что gpt-4.1-nano
-    // берёт ~0.015₽/1K prompt — даже урезанные блоки плюс system-prompt уже
-    // приближаются к лимиту 0.07₽. Первый ответ модели обычно содержит самое
-    // важное; при урезании оставляем именно его.
-    const MAX_BLOCK_CHARS = 1800;
+    // VseGPT делает soft pre-flight по (prompt + max_completion). Жёстко
+    // урезаем блоки: gpt-4.1-nano берёт ≈0.015₽/1K prompt, а ещё vsegpt
+    // принудительно ставит min max_completion ≈700 для этой модели, т.е.
+    // completion стоит 0.06₽/1K * 0.7 ≈ 0.042₽. Лимит пользователя 0.07₽
+    // → на input остаётся ≈0.028₽ ≈ 1860 токенов ≈ 1700 символов смешанного
+    // русского+кода. Поэтому trim ≤1200 символов и системный промпт короткий.
+    const MAX_BLOCK_CHARS = 1200;
     const blocks = rawBlocks.length > MAX_BLOCK_CHARS
       ? rawBlocks.slice(0, MAX_BLOCK_CHARS) + '\n\n[… урезано для бюджета …]'
       : rawBlocks;
+    const sysForSynth = 'Синтезатор двух ответов. Сохрани все блоки кода с пометкой `// file:` или `<!-- file:-->` КАК ЕСТЬ, не перефразируй. Объедини лучшее в один точный ответ на русском. Не упоминай другие модели. Тон Replit-агент: 2-4 коротких предложения, без вступлений. Формат: что изменено одной строкой через запятую.';
+    const userForSynth = 'Запрос:\n' + content + '\n\nОтветы:\n' + blocks;
+    const totalInChars = sysForSynth.length + userForSynth.length;
+    // Если даже после trim input превышает бюджет — НЕ делаем синтез
+    // вообще, отдаём лучший ответ делегата напрямую. Это гарантированно
+    // проходит soft-limit, и пользователь получает ответ, а не ошибку.
+    if (totalInChars > 1700) {
+      onStep && onStep('Синтез: input слишком большой (' + totalInChars + ' символов) → отдаю прямой ответ делегата');
+      return { text: ok[0].text, model: ok[0].id };
+    }
+    const synthMsgs = [
+      { role: 'system', content: sysForSynth },
+      { role: 'user', content: userForSynth }
+    ];
     onStep && onStep('Синтез финального ответа…');
     let synth;
-    const synthMsgs = [
-      { role: 'system', content: 'Синтезатор. ОБЯЗАТЕЛЬНО сохраняй все блоки кода с пометкой `// file: path`, `<!-- file: path -->` или подобные — КАК ЕСТЬ, не перефразируй и не теряй. Объедини лучшие части ответов в один точный ответ на русском. Не упоминай, что было несколько моделей.\n\n=== ТОН: REPLIT-AGENT ===\nПиши как инженер в Slack — не эссеист. Не более 2-4 предложений prose. Без вступлений: «Давайте», «Хорошо», «Сейчас я», «Я рассмотрю», «Мы должны», «Вот мой план», «Давайте начнём». Без объяснений очевидного. Без встречных вопросов в конце. Формат — что изменено одной строкой через запятую + одно предложение пояснения при необходимости.' },
-      { role: 'user', content: 'Запрос:\n<<<\n' + content + '>>>\n\nОтветы:\n' + blocks }
-    ];
-    // budgetedMaxTokens учитывает РЕАЛЬНЫЙ размер сообщений и сужает
-    // max_completion так, чтобы (prompt + max) уложились в 0.07₽.
-    const synthMax = budgetedMaxTokens(routerModel, synthMsgs, 512);
+    // VseGPT для gpt-4.1-nano игнорирует max_tokens ниже ~700 (smoke-test
+    // показал 2254→700 при max=256). Поэтому сразу передаём 700, а
+    // budgetedMaxTokens используется как sanity-cap на случай дороже.
+    const synthMax = Math.max(700, budgetedMaxTokens(routerModel, synthMsgs, 700));
     try { synth = await callOpenAI(routerModel, synthMsgs, synthMax); }
     catch (err) {
       onStep && onStep('Синтез упал: ' + err.message);
