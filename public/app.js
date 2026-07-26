@@ -1396,7 +1396,7 @@
   // Ловим одной предикатной функцией — единое правило fallback.
   function isBudgetOrModelError(msg) {
     if (!msg) return false;
-    return /Exceeded|soft user limit|expected price|expected_cost|insufficient|not enough|balance|not available|upgrade.*subscription|subscription plan|model.*not.*supported|Rate.limit|rate limit|too many requests|недоступн|не хватает|лимит|лими/i.test(String(msg));
+    return /Exceeded|soft user limit|expected price|expected_cost|insufficient|not enough|balance|not available|not\s+found|не\s+найден|Internal Server Error|model.*not.*supported|model.*not.*found|provider.*error|Upgrade|upgrade.*subscription|subscription plan|Rate.limit|rate limit|too many requests|недоступн|не хватает|лимит|лими/i.test(String(msg));
   }
 
   // Чёрный список моделей, которые вернули ошибку доступности/плана.
@@ -2106,7 +2106,7 @@
       if (allChanges.length) await applyCodeChanges(allChanges);
       if (looksLikeCodeTask(content) && !allChanges.length) {
         onStep && onStep('Ни один эксперт не выдал код — повтор одной сильной модели с требованием…');
-        const forced = ORCHESTRATOR_MODELS.find(m => m.coding && m.vision) || ORCHESTRATOR_MODELS.find(m => m.coding) || ORCHESTRATOR_MODELS[0];
+        const forced = ORCHESTRATOR_MODELS.find(m => m.coding && m.vision && isAvailableModel(m.id)) || ORCHESTRATOR_MODELS.find(m => m.coding && isAvailableModel(m.id)) || ORCHESTRATOR_MODELS.find(m => isAvailableModel(m.id)) || ORCHESTRATOR_MODELS[0];
         try {
           const fr = await callOpenAI(forced.id, [
             ...(await delegateMessages(forced.id)),
