@@ -48,8 +48,10 @@
   // токены раздуваются.
 
   // Канвасный downsample для больших картинок: ≥≈600 КБ base64 уменьшаем до
-  // maxDim=1024 JPEG quality=0.7 — типичный паст-скриншот падает с 200+ КБ
-  // до 30-60 КБ и перестаёт ломать контекстные окна VseGPT.
+  // maxDim=640 JPEG quality=0.55 — типичный паст-скриншот падает с 200+ КБ
+  // до 15-30 КБ, чтобы вписаться в VseGPT soft-limit (2₽ по 0.055₽/1K ≈ 36K
+  // токенов ≈ 140 КБ base64). Если картинка всё ещё бьёт лимит — fallback на
+  // текстовое описание.
   function downsampleImage(dataUrl, maxDim, quality) {
     return new Promise((resolve) => {
       try {
@@ -57,17 +59,24 @@
         const mime = /data:([^;]+);/i.exec(dataUrl);
         const isPng = mime && /png/i.test(mime[1]);
         img.onload = () => {
-          const big = Math.max(img.width, img.height);
-          const scale = Math.min(1, maxDim / (big || 1));
-          if (scale >= 1 && dataUrl.length < 700000) return resolve(dataUrl);
-          const w = Math.max(1, Math.round(img.width * scale));
-          const h = Math.max(1, Math.round(img.height * scale));
-          const cv = document.createElement('canvas');
-          cv.width = w; cv.height = h;
-          const ctx = cv.getContext('2d');
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, w, h);
-          const out = isPng ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', quality);
+          // Каскадное сжатие: сначала maxDim 640, если >80КБ — пробуем 400px
+          const tryDim = (d, q) => {
+            const s = Math.min(1, d / (Math.max(img.width, img.height) || 1));
+            if (s >= 1 && dataUrl.length < 150000) return null; // не нужно сжимать
+            const w = Math.max(1, Math.round(img.width * s));
+            const h = Math.max(1, Math.round(img.height * s));
+            const cv = document.createElement('canvas');
+            cv.width = w; cv.height = h;
+            const ctx = cv.getContext('2d');
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, w, h);
+            return isPng ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', q);
+          };
+          let out = tryDim(640, 0.55) || dataUrl;
+          // Если всё ещё >80КБ — жмём сильнее (400px, q=0.4)
+          if (out.length > 80000) out = tryDim(400, 0.4) || out;
+          // Если >80КБ — жмём до 300px, q=0.3
+          if (out.length > 80000) out = tryDim(300, 0.3) || out;
           resolve(out);
         };
         img.onerror = () => resolve(dataUrl);
@@ -1473,7 +1482,7 @@
   // Бюджет на один запрос (руб). С учётом минимальной цены vision-запроса в VseGPT
   // (~0.09₽) и запасом на retry — лимит 0.1₽. В настройках VseGPT должен быть
   // установлен такой же или больший лимит.
-  const BUDGET_RUB = 0.1;
+  const BUDGET_RUB = 2.0;
   // Цены prompt/completion в ₽ за 1000 токенов — актуальны для VseGPT.ru.
   // Статический ростер: только дешёвые vision-модели для кода/UI/скриншотов.
   // Мульти-AI отключён.
@@ -1843,10 +1852,26 @@
     }
     routerResp = routerR.text;
     let decision = {};
+    let secondAttempt = false;
     try {
       const m = routerResp.match(/\{[\s\S]*?\}/);
       decision = JSON.parse(m ? m[0] : routerResp);
     } catch {}
+    // Perplexity может не выдать JSON — fallback на Qwen 3 14B (0.045₽/1K)
+    if (!decision.action) {
+      onStep && onStep('Perplexity не вернул JSON → fallback роутер (Qwen 3 14B)');
+      try {
+        const fallbackRouter = await callOpenAI('qwen/qwen3-14b', [
+          { role: 'system', content: orchestratorPrompt(mode) },
+          { role: 'user', content: await userContentFor(content, attachments, false) }
+        ], 512);
+        if (fallbackRouter.text && !fallbackRouter.error) {
+          const m = fallbackRouter.text.match(/\{[\s\S]*?\}/);
+          decision = JSON.parse(m ? m[0] : fallbackRouter.text);
+          secondAttempt = true;
+        }
+      } catch {}
+    }
     if (decision.action === 'direct') {
       const directText = (decision.answer && decision.answer.trim()) || routerResp || '';
       // Если задача явно про код, а ответ маршрутизатора — verbose prose
@@ -2058,7 +2083,29 @@
       onStep && onStep('Часть моделей вернула ошибку: ' + failed.map(f => f.id + ' (' + f.error + ')').join(', '));
     }
     if (!ok.length) {
-      return { text: '', error: 'Все модели в multi-опросе упали: ' + failed.map(f => f.id + ' [' + f.error + ']').join('; '), model: ids.join(',') };
+      // Fallback-цепочка: если все модели упали по бюджету/сети, пробуем
+      // Perplexity Large (бесплатно, 0₽/1K, веб-поиск) как аварийный вариант.
+      onStep && onStep('Все делегаты упали → fallback на Perplexity Large (0₽)');
+      try {
+        const fallbackMsgs = await slimDelegateMessages('perplexity/latest-large-online', true, content, attachments);
+        const fallback = await callOpenAI('perplexity/latest-large-online', fallbackMsgs, 2048);
+        if (fallback.text && !fallback.error) {
+          return { text: fallback.text, model: 'perplexity/latest-large-online' };
+        }
+        // Второй fallback: Perplexity Small (тоже 0₽, быстрее)
+        onStep && onStep('Perplexity Large не сработал → fallback на Perplexity Small (0₽)');
+        const fallback2 = await callOpenAI('perplexity/latest-small-online', fallbackMsgs, 2048);
+        if (fallback2.text && !fallback2.error) {
+          return { text: fallback2.text, model: 'perplexity/latest-small-online' };
+        }
+      } catch (fbErr) {
+        // Fallback тоже не сработал — отдаём диагностику
+      }
+      return {
+        text: '',
+        error: 'Все модели в multi-опросе упали: ' + failed.map(f => f.id + ' [' + f.error + ']').join('; ') + '\n\n💡 Увеличьте лимит VseGPT: https://vsegpt.ru/User/SettingsModels (рекомендую 2–5₽)',
+        model: ids.join(',')
+      };
     }
     try {
       const allChanges = [];
