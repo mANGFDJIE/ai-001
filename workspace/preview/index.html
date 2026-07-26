@@ -3,37 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерфейс</title>
     <link rel="stylesheet" href="styles.css">
-    <title>Услуги рядом</title>
 </head>
 <body>
-    <header>
-        <h1>Услуги рядом</h1>
-        <nav>
-            <ul>
-                <li><a href="#services">Услуги</a></li>
-                <li><a href="#contact">Контакт</a></li>
-            </ul>
-        </nav>
-    </header>
-    <main>
-        <section id="services">
-            <h2>Наши услуги</h2>
-            <div class="service-list"></div>
-        </section>
-        <section id="contact">
-            <h2>Свяжитесь с нами</h2>
-            <form id="contactForm">
-                <input type="text" placeholder="Ваше имя" required>
-                <input type="email" placeholder="Ваш email" required>
-                <textarea placeholder="Сообщение" required></textarea>
-                <button type="submit">Отправить</button>
-            </form>
-        </section>
-    </main>
-    <footer>
-        <p>© 2023 Услуги рядом</p>
-    </footer>
+    <div class="container">
+        <div class="header">
+            <h1>Заголовок</h1>
+        </div>
+        <div class="content">
+            <div class="sidebar">
+                <ul>
+                    <li>Пункт 1</li>
+                    <li>Пункт 2</li>
+                    <li>Пункт 3</li>
+                </ul>
+            </div>
+            <div class="main">
+                <div class="card">
+                    <h2>Карточка 1</h2>
+                    <p>Содержимое карточки 1</p>
+                </div>
+                <div class="card">
+                    <h2>Карточка 2</h2>
+                    <p>Содержимое карточки 2</p>
+                </div>
+            </div>
+        </div>
+        <div class="footer">
+            <p>Футер</p>
+        </div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>

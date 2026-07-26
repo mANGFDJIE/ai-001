@@ -1357,6 +1357,12 @@
 
   function renderMarkdown(text) {
     if (!text) return '';
+    // Защитный пояс: даже если orchestrator/local/deepseek-flow не вызвали
+    // stripCodeFromChat (бывает при первом рендере без applyCodeChanges,
+    // или если regex не сработал на нестандартном markdown), здесь прогоняем
+    // тот же фильтр. Тогда код НЕ проникнет в bubble, даже если пришёл из
+    // истории, после reload, или из ответвлений без extractCodeChanges.
+    text = stripCodeFromChat(text, []);
     let html = escHtml(text);
     // Fenced code-блоки заворачиваем в <details> — код свёрнут по умолчанию,
     // пользователь сам решает, развернуть ли. Если провайдер выдаёт код в

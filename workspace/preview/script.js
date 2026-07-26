@@ -1,3 +1,3 @@
-document.getElementById('clickMe').addEventListener('click', function() {
-    alert('Кнопка нажата!');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Документ загружен');
 });
