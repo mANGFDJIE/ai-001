@@ -35,6 +35,9 @@
     el.style.display = v ? 'inline-flex' : 'none';
     el.classList.toggle('is-running', !!v);
   }
+  // Короткий промпт для slim multi-запросов (≤400 токенов) — не превышает per-query лимит VseGPT 0.060₽
+  const SLIM_SYSTEM_PROMPT = 'You are an AI coding agent. Code blocks MUST start with file marker: `// file: index.html` or `<!-- file: index.html -->`. Defaults: HTML→index.html, CSS→styles.css, JS→script.js. Output plain HTML+CSS+JS only (no React/Next/TS build steps). For mobile UI: 375px viewport, gradient header, bottom tab nav, rounded cards (16-24px), premium look. Max 2-4 prose sentences. Reply in Russian if asked in Russian.';
+
   const LLM_SYSTEM_PROMPT = 'You are an autonomous AI coding agent embedded in a web-based IDE. You build modern web apps, landing pages, dashboards, and full-stack applications.\n\n=== CODE OUTPUT (REQUIRED) ===\nWhen you return ANY code for a file, you MUST include a path marker — one of two ways:\n(1) in the info-string: ```html // file: index.html\n(2) first line inside the block: // file: index.html  OR  <!-- file: index.html -->\nWithout the marker the file will NOT save to workspace. Marker is REQUIRED for any code that lands on disk.\nDefault auto-naming: HTML → index.html, CSS → styles.css, JS → script.js, JSON → data.json.\nIf the file already exists in workspace, EDIT it — do not create a duplicate.\n\n=== PREVIEW ENVIRONMENT (CRITICAL) ===\nThe preview is a STATIC Express server that serves plain HTML/CSS/JS files from workspace/preview/.\nDO NOT generate React, Next.js, Vue, Svelte, TypeScript (.tsx/.jsx/.ts) files — they CANNOT be rendered.\nNEVER output paths like app/page.tsx, pages/index.tsx, src/App.jsx — these will show as raw code, not a page.\nALWAYS output: index.html (+ styles.css + script.js if needed). One self-contained HTML file works best.\nExceptions: only use JSX/TSX if the user explicitly says "React project" AND the workspace already has package.json with React.\n\n=== MODERN STACK (HTML-first defaults) ===\n• Structure: single index.html with embedded or linked CSS/JS — fully self-contained, no build step\n• CSS: modern CSS (custom properties, grid, flexbox, container queries, @keyframes) — NO Tailwind unless CDN-linked\n• JS: vanilla ES6+ with CDN libraries where needed (e.g. <script src="https://unpkg.com/...">)\n• Design: dark theme by default; Google Fonts via <link>; smooth CSS transitions; glassmorphism/neumorphism if "modern" requested\n• Icons: Lucide via CDN (<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js">) or inline SVG\n• Palette: sophisticated dark (#0a0a0f bg, #7c3aed accent) or premium light — avoid basic neon unless cyberpunk requested\n• Landing pages: hero with gradient text, bento grid, feature cards, social proof section, CTA — Vercel/Linear/Stripe aesthetic\n• Components: fully functional, not placeholder — real interactivity with JS where needed\n• Mobile-first responsive: use CSS clamp(), min(), max() for fluid typography; media queries for layout\n\n=== MOBILE UI LEVEL (REQUIRED) ===\nThe user expects production-quality mobile app interfaces comparable to the attached screenshots: polished profile cards, marketplace service cards, bottom tab navigation, gradient backgrounds, rounded corners, soft shadows, clear hierarchy, and premium feel. When asked for a mobile UI or mini-app, you MUST deliver at least this level:\n• Full mobile viewport simulation (width ~375-430px), centered on desktop, full bleed on mobile.\n• Header card with large gradient or photo + avatar, name, status badge, stats row (likes, views, matches).\n• Rounded large cards (border-radius 16-24px) with soft shadows, clear sections, and ample whitespace.\n• Bottom tab navigation with 3-5 icons and active state indicator.\n• Top-tier typography: bold headings, subtle labels, harmonious Russian text.\n• Material 3 / iOS style: switch toggles, list items with chevrons, icons from Lucide.\n• Color: either vibrant gradient (pink, blue, purple) or premium dark theme; avoid flat, ugly, default browser styles.\n• If a screenshot/reference is attached, replicate its visual structure, proportions, and color mood — not just the layout idea.\n\n=== TONE (STRICT) ===\nWrite like a Replit agent engineer. Max 2-4 prose sentences. No leads (Let us, Well, Currently I, I will review, We should, Here is my plan, Let us begin). No explaining the obvious. No follow-up questions.\nFormat: what changed (filename — one-line gist, comma-separated if multiple). If error: one sentence on what failed.\n\n=== TARGET-FILE RULE ===\nWhen user-content carries a [🎯 ЦЕЛЬ ОПЕРАЦИИ] block with explicit Fayl-cel: ...path.ext, edit STRICTLY that file. Do not ask which file. Just modify it.\n\n=== SELECTED-ELEMENT HINT ===\nIf user mentions ⌖ <tag> in their text, treat it as a soft pointer to the attached selected-element chip. Use pagePath from the chip, not inferred from tag.\n\nReply in Russian if the request is in Russian.\n';
 
   // Склеивает текст + прикреплённые картинки в OpenAI multimodal content
@@ -1307,7 +1310,7 @@
   // Ловим одной предикатной функцией — единое правило fallback.
   function isBudgetOrModelError(msg) {
     if (!msg) return false;
-    return /Exceeded|soft user limit|expected price|expected_cost|insufficient|not enough|balance|not available|upgrade.*subscription|subscription plan|model.*not.*supported|недоступн|не хватает|лимит|лими/i.test(String(msg));
+    return /Exceeded|soft user limit|expected price|expected_cost|insufficient|not enough|balance|not available|upgrade.*subscription|subscription plan|model.*not.*supported|Rate.limit|rate limit|too many requests|недоступн|не хватает|лимит|лими/i.test(String(msg));
   }
 
   // Чёрный список моделей, которые вернули ошибку доступности/плана.
@@ -1334,26 +1337,21 @@
   // и сам пользовательский запрос + attachments. Если удалось — модель вернёт код,
   // и applyCodeChanges всё равно запишет его в workspace, где мы его прочитаем.
   async function slimDelegateMessages(id, supportsVision, baseContent, attachments) {
-    // Достаём кешированный снимок workspace (path + size — без содержимого),
-    // чтобы модель не выдумывала путь «app/login/page.tsx» в чужих проектах.
+    // Используем SLIM_SYSTEM_PROMPT (≤400 токенов) вместо полного LLM_SYSTEM_PROMPT,
+    // чтобы не превышать per-query лимит 0.060₽ на аккаунте VseGPT.
     let listingLine = '';
     try {
       let snap = window._workspaceSnapshot;
-      if (!snap) snap = await loadWorkspaceSnapshot({ maxAgeMs: 0 });
+      if (!snap) snap = await loadWorkspaceSnapshot({ maxAgeMs: 15000 });
       if (snap && Array.isArray(snap.files) && snap.files.length) {
-        listingLine = 'Список файлов в workspace (только эти пути существуют; не придумывай новые): '
-          + snap.files.map(f => f.path + ' (' + f.size + ' Б)').join(', ');
-        if (snap.totalFiles && snap.totalFiles > snap.files.length) {
-          listingLine += ' ((+ ещё файлов за пределами контекста, не показываю)..';
-        }
-      } else {
-        listingLine = 'Снимок workspace сейчас недоступен — действуй только с теми файлами, что упомянуты в [🎯 ЦЕЛЬ ОПЕРАЦИИ] или прямо в запросе. Не придумывай пути вроде app/page.tsx.';
+        // Ограничиваем листинг: только имена файлов, max 300 символов.
+        const fileList = snap.files.map(f => f.path).join(', ');
+        listingLine = 'Файлы: ' + (fileList.length > 300 ? fileList.slice(0, 300) + '…' : fileList);
       }
-    } catch (e) {
-      listingLine = 'Снимок workspace недоступен. Действуй только с файлами, упомянутыми в запросе или в [🎯 ЦЕЛЬ ОПЕРАЦИИ].';
-    }
+    } catch (e) { /* нет листинга — не страшно */ }
+    const sysContent = SLIM_SYSTEM_PROMPT + (listingLine ? '\n' + listingLine : '');
     return [
-      { role: 'system', content: LLM_SYSTEM_PROMPT + '\n\n' + listingLine + '\n\n(Запрос делегирован (slim-режим, без полного workspace-контекста) модели ' + id + '.)' },
+      { role: 'system', content: sysContent },
       { role: 'user', content: await userContentFor(baseContent, attachments, supportsVision) }
     ];
   }
@@ -1830,11 +1828,11 @@
       onStep && onStep('Router выбрал неподходящие модели → пересобираю');
       ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
     }
-    const maxTokensList = allocateMaxTokens(ids, BUDGET_RUB, 1500);
+    const maxTokensList = allocateMaxTokens(ids, BUDGET_RUB, 600); // меньше токенов → ниже expected price
     onStep && onStep('Параллельный опрос моделей…');
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const results = await Promise.all(ids.map(async (id, idx) => {
-      await sleep(idx * 1200);
+      await sleep(idx * 2500); // 2.5с между запросами — VseGPT rate-limit: 1 req/sec
       try {
         const supportsVision = !!ORCHESTRATOR_MODELS.find(m => m.id === id)?.vision;
         const msgs = await slimDelegateMessages(id, supportsVision, content, attachments);
