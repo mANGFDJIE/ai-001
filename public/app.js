@@ -141,10 +141,30 @@
           } catch {}
         }
         if (modelsData && modelsData.length) {
-          refreshOrchestratorModels(modelsData);
+          // Серверный scout отдаёт наш нормализованный формат (id, prompt,
+          // completion, vision, coding, score). Тогда это source-of-truth:
+          // цены и состав ростера — с scout, который курирует каждый час.
+          // Если scout не отдал — fallback на /api/models (старый каталог
+          // OpenAI-shape), который мерджим с baseline как раньше.
+          const isScoutShape = modelsData[0] && ('prompt' in modelsData[0])
+            && !('pricing' in modelsData[0]);
+          if (isScoutShape) {
+            ORCHESTRATOR_MODELS = modelsData.map(m => ({
+              id: m.id,
+              prompt: m.prompt || 0,
+              completion: m.completion || 0,
+              vision: !!m.vision,
+              coding: !!m.coding,
+              score: m.score || 0,
+              tier: (m.vision && m.coding) ? 'vision' : (m.coding ? 'mid' : 'free'),
+            })).sort((a, b) => (b.score - a.score) || ((a.prompt + a.completion) - (b.prompt + b.completion)));
+            console.log('[orchestrator] ростер собран из scout:', ORCHESTRATOR_MODELS.length, 'моделей');
+          } else {
+            refreshOrchestratorModels(modelsData);
+          }
           rebuildDirectModelPresets();
           renderModelDropdown();
-          console.log('[models] ростер обновлён:', modelsData.length);
+          console.log('[models] дропдаун обновлён:', ORCHESTRATOR_MODELS.length);
         }
       } catch (e) { console.log('[models] авто-сканер не смог загрузить каталог:', e); }
     }

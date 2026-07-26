@@ -1,19 +1,25 @@
 body {
     font-family: Arial, sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+    background-color: #e0f7fa;
+    color: #26465d;
     margin: 0;
-    background-color: #f0f0f0;
+    padding: 0;
 }
-
-h1 {
-    color: #333;
+header {
+    background-color: #00b8d9;
+    padding: 10px;
+    text-align: center;
+    color: white;
 }
-
-button {
-    padding: 10px 20px;
-    font-size: 16px;
+main {
+    padding: 20px;
+}
+button, input {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px;
+    margin: 5px 0;
     cursor: pointer;
+    border-radius: 5px;
 }
