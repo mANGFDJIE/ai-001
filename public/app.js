@@ -1399,28 +1399,26 @@
   // Бюджет на один запрос (руб). Жёсткий лимит: один запрос не дороже 0.07₽.
   const BUDGET_RUB = 0.07;
   // Цены prompt/completion в ₽ за 1000 токенов — актуальны для VseGPT.ru.
-  // Отобраны вручную: дешёвые кодеры + две vision-модели для работы со скриншотами.
+  // Список урезан: только дешёвые и эффективные модели для кода/UI/vision.
+  // Мульти-AI отключён — оркестратор выбирает ОДНУ модель под задачу.
   const BASELINE_ORCHESTRATOR_MODELS = [
-    // ── Маршрутизатор (router) — лёгкий, structured JSON, 1M ctx
-    { id: 'openai/gpt-4.1-nano',                          tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
-    // ── Топ-кодеры (coding/UI/лендинги) — проверены на VseGPT
-    { id: 'mistralai/devstral-small',                     tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.045 },
-    { id: 'google/gemini-2.5-flash-lite',                 tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
-    { id: 'google/gemini-2.5-flash-pre',                  tier: 'mid',  coding: true,  vision: false, prompt: 0.018, completion: 0.07  },
-    { id: 'qwen/qwen3-32b',                               tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.055 },
-    { id: 'qwen/qwen3-14b',                               tier: 'mid',  coding: true,  vision: false, prompt: 0.012, completion: 0.033 },
-    { id: 'mistralai/mistral-small-3.2-24b-instruct',     tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.045 },
-    { id: 'deepseek/deepseek-chat',                       tier: 'mid',  coding: true,  vision: false, prompt: 0.03,  completion: 0.06  },
-    { id: 'meta-llama/llama-4-scout',                     tier: 'mid',  coding: true,  vision: false, prompt: 0.022, completion: 0.08  },
-    // ── Сверхдёшевые альтернативы
-    { id: 'amazon/nova-micro-v1',                         tier: 'mid',  coding: true,  vision: false, prompt: 0.012, completion: 0.03  },
-    { id: 'cohere/command-r7b-12-2024',                   tier: 'mid',  coding: false, vision: false, prompt: 0.01,  completion: 0.025 },
-    // ── Vision — для скриншотов и картинок
-    { id: 'vis-openai/gpt-5-nano',                        tier: 'mid',  coding: true,  vision: true,  prompt: 0.015, completion: 0.12  },
-    { id: 'vis-meta-llama/llama-3.2-11b-vision-instruct', tier: 'mid',  coding: false, vision: true,  prompt: 0.055, completion: 0.055 },
-    // ── Бесплатные (0₽)
-    { id: 'perplexity/latest-large-online',               tier: 'free', coding: false, vision: false, prompt: 0,     completion: 0     },
-    { id: 'perplexity/latest-small-online',               tier: 'free', coding: false, vision: false, prompt: 0,     completion: 0     },
+    // ── Сверхдёшевые кодеры (выбор по умолчанию для экономии)
+    { id: 'amazon/nova-micro-v1',                         tier: 'cheap',  coding: true,  vision: false, prompt: 0.012, completion: 0.03  },
+    { id: 'cohere/command-r7b-12-2024',                   tier: 'cheap',  coding: true,  vision: false, prompt: 0.01,  completion: 0.025 },
+    { id: 'qwen/qwen3-14b',                               tier: 'cheap',  coding: true,  vision: false, prompt: 0.012, completion: 0.033 },
+    // ── Рабочие лошадки для UI/лендингов/mini-app
+    { id: 'openai/gpt-4.1-nano',                          tier: 'mid',    coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
+    { id: 'google/gemini-2.5-flash-lite',                 tier: 'mid',    coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
+    { id: 'mistralai/devstral-small',                     tier: 'mid',    coding: true,  vision: false, prompt: 0.015, completion: 0.045 },
+    // ── Мощные кодеры (используются только для сложных задач, дороже)
+    { id: 'deepseek/deepseek-coder',                      tier: 'strong', coding: true,  vision: false, prompt: 0.04,  completion: 0.05  },
+    { id: 'qwen/qwen-2.5-coder-32b-instruct',             tier: 'strong', coding: true,  vision: false, prompt: 0.05,  completion: 0.05  },
+    // ── Vision — для скриншотов и картинок (используются только когда есть изображение)
+    { id: 'vis-openai/gpt-5-nano',                        tier: 'vision', coding: true,  vision: true,  prompt: 0.015, completion: 0.12  },
+    { id: 'vis-meta-llama/llama-3.2-11b-vision-instruct', tier: 'vision', coding: false, vision: true,  prompt: 0.055, completion: 0.055 },
+    // ── Бесплатные (0₽) — только для веб-поиска/фактов, не для генерации кода
+    { id: 'perplexity/latest-small-online',               tier: 'free',   coding: false, vision: false, prompt: 0,     completion: 0     },
+    { id: 'perplexity/latest-large-online',               tier: 'free',   coding: false, vision: false, prompt: 0,     completion: 0     },
   ];
   // Активный ростер. Инициализируется baseline, потом обновляется через /api/models.
   let ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
@@ -1552,6 +1550,19 @@
     return tokens;
   }
 
+  // Ограничивает max_tokens для одной модели, чтобы запрос уложился в BUDGET_RUB.
+  // Используется вместо allocateMaxTokens, т.к. мульти-AI отключён.
+  function capMaxTokens(modelId, budgetRub = BUDGET_RUB, promptTokens = 1500) {
+    const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
+    if (!m || !m.completion) return 1024;
+    const promptCost = (m.prompt * promptTokens) / 1000;
+    const remaining = budgetRub - promptCost;
+    if (remaining <= 0) return 256;
+    // Vision-модели: картинка жрёт токены, completion ограничиваем жёстче
+    const hardCap = m.vision ? 1024 : 2048;
+    return Math.max(256, Math.min(hardCap, Math.floor((remaining / m.completion) * 1000)));
+  }
+
   function orchestratorPrompt(mode) {
     const list = ORCHESTRATOR_MODELS.map(m => {
       const tag = m.coding ? '(coding)' : m.tier === 'free' ? '(free)' : m.tier === 'mid' ? '(mid)' : '(light)';
@@ -1577,8 +1588,8 @@
       'ВАЖНО: платформа заточена под разработку современных веб-приложений, лендингов, mini-app. По умолчанию delegate или multi. Direct — только для чистого Q&A без кода.',
       '',
       mode === 'auto'
-        ? 'Верни ОДИН JSON-объект: {"action":"direct"|"delegate"|"multi", "answer":"...", "model":"<id>", "models":["<id>","<id>"]}. Правила: direct — только для короткого Q&A без кода (поле answer). delegate — одна сильная модель для простой задачи. multi — 2–3 модели параллельно для сложных/UI/лендингов/миниапсов. Если есть картинка — включи vision-модель. Всё должно уложиться в 0.07₽ на 1500 prompt + 1500 completion.'
-        : 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 2–3 id (один с coding, один с vision если есть картинка). Бюджет: 0.07₽ суммарно.',
+        ? 'Верни ОДИН JSON-объект: {"action":"direct"|"delegate", "answer":"...", "model":"<id>"}. Правила: direct — только для короткого Q&A без кода (поле answer). delegate — одна лучшая модель для задачи. Для кода/UI/лендингов/миниапсов — всегда delegate. Если есть картинка — выбери модель с меткой ·vision. Всё должно уложиться в 0.07₽ на запрос.'
+        : 'Верни ОДИН JSON-объект: {"action":"delegate", "model":"<id>"} — выбери одну модель (coding или vision если есть картинка). Бюджет: 0.07₽.',
       '',
       'Без prose. Без тройных бэктиков. Без пояснений. Без "Мы видим, что...". Один JSON от первого до последнего символа.',
       '',
@@ -1701,11 +1712,8 @@
         { role: 'user', content: await userContentFor(content, attachments, supportsVision) }
       ];
     };
-    // В режиме Мульти AI не нужен router — сразу запускаем параллельный опрос.
-    // Это экономит кредиты и исключает утечку JSON-ответа router в чат.
-    if (mode === 'multi') {
-      return await runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel);
-    }
+    // Мульти AI отключён: теперь router выбирает одну лучшую модель под задачу.
+    // Это убирает параллельные запросы и позволяет уложиться в лимит 0.07₽.
 
     onStep && onStep('Маршрутизация (gpt-4.1-nano)…');
     let routerResp = '';
@@ -1758,7 +1766,7 @@
                 const r2 = await callOpenAI(strongId, [
                   ...(await delegateMessages(strongId)),
                   { role: 'user', content: 'PREVIOUS ANSWER HAD NO CODE OR WAS FUZZY PROSE (variant: vezde/poluchili/net-konkretnogo/podrazumevaetsya). Repeat strictly: full code blocks inside triple backticks with "// file: path" or "<!-- file: path -->" on the first line. No thinking-out-loud prose. Only code + one final line. If the target file is unclear, pick the most likely HTML file from the workspace listing above and write its full content with the correct path.' }
-                ]);
+                ], capMaxTokens(strongId));
                 if (!r2.error && r2.text) return { text: r2.text, model: strongId };
               } catch {}
             }
@@ -1779,7 +1787,7 @@
       }
       onStep && onStep('Делегирование → ' + id);
       let r;
-      try { r = await callOpenAI(id, await delegateMessages(id)); }
+      try { r = await callOpenAI(id, await delegateMessages(id), capMaxTokens(id)); }
       catch (err) {
         onStep && onStep('Делегат ' + id + ' ошибка: ' + err.message);
         return { text: '', error: id + ': ' + err.message, model: id };
@@ -1802,7 +1810,7 @@
               // Сначала slim — без workspace-контекста, чтобы не пухнуть выше
               // лимита VseGPT.
               const slim = await slimDelegateMessages(m.id, supportsVision, content, attachments);
-              const nr = await callOpenAI(m.id, slim);
+              const nr = await callOpenAI(m.id, slim, capMaxTokens(m.id));
               if (!nr.error) { fallbackId = m.id; fallbackResp = nr; break; }
               // Если slim тоже упирается в лимит → пробуем FULL delegateMessages
               // (только если экзек не повторяется дословно).
@@ -1825,17 +1833,18 @@
             ...(await delegateMessages(id)),
             { role: 'user', content: 'ПРЕДЫДУЩИЙ ОТВЕТ НЕ СОДЕРЖАЛ КОДА — только prose «опишу что сделаю». Повтори ответ строго в формате: полный блок кода (или несколько) в тройных бэктиках, каждый с пометкой `// file: path` или `<!-- file: path -->` в первой строке, и одно предложение итога. Без планов, без перечислений, без "Главные изменения:". Если ничего не нужно менять — напиши код, который ничего не меняет.' }
           ];
-          const r2 = await callOpenAI(id, forcedMsgs);
+          const r2 = await callOpenAI(id, forcedMsgs, capMaxTokens(id));
           if (!r2.error && r2.text) r = r2;
         } catch (e) { onStep && onStep('Повторный запрос делегата упал: ' + e.message); }
       }
       return { text: r.text, model: id };
     }
     if (decision.action === 'multi') {
+      // Мульти-AI отключён: берём одну лучшую модель из router-списка и делегируем.
       let ids = Array.isArray(decision.models) ? decision.models : [];
       if (hasImageAttachment) ids = ids.map(id => pickVision(id, false));
-      ids = ids.filter(id => ORCHESTRATOR_MODELS.find(m => m.id === id)).slice(0, 3);
-      return await runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel, ids);
+      decision.model = ids.find(id => ORCHESTRATOR_MODELS.find(m => m.id === id)) || (ORCHESTRATOR_MODELS.find(m => m.coding) || ORCHESTRATOR_MODELS[0]).id;
+      decision.action = 'delegate';
     }
     return { text: '', error: 'Неизвестное действие: ' + decision.action, model: routerModel };
   }

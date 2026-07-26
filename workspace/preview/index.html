@@ -1,148 +1,38 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Киберпанк Стиль</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet" />
-<style>
-  :root {
-    --bg-color: #0a0a0f;
-    --accent-color: #f0f;
-    --neon-color: #0ff;
-    --dark-gray: #222;
-    --primary: #ff00ff;
-    --secondary: #00ffff;
-    --accent: #ff0080;
-    --text-color: #e0e0e0;
-    --muted: #a0a0a0;
-    --glitch1: #ff00ff;
-    --glitch2: #00ffff;
-    --glitch3: #ff0080;
-    --border-radius: 12px;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
-  }
-  *, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-  body {
-    background: linear-gradient(135deg, var(--bg-color), #1a1a1d);
-    color: var(--text-color);
-    font-family: 'Orbitron', sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    min-height: 100vh;
-    padding: 20px;
-    overflow-x: hidden;
-  }
-  h1 {
-    font-size: clamp(2rem, 5vw, 4rem);
-    text-align: center;
-    background: linear-gradient(45deg, var(--primary), var(--secondary));
-    background-size: 600% 600%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: gradientAnimation 10s ease infinite;
-    margin: 40px 0;
-  }
-  @keyframes gradientAnimation {
-    0% {background-position: 0% 50%;}
-    50% {background-position: 100% 50%;}
-    100% {background-position: 0% 50%;}
-  }
-  .card {
-    background-color: var(--dark-gray);
-    border-radius: var(--border-radius);
-    padding: 20px;
-    max-width: 300px;
-    width: 100%;
-    box-shadow: var(--shadow-md);
-    margin: 20px 0;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.3s, box-shadow 0.3s;
-  }
-  .card:hover {
-    transform: scale(1.02);
-    box-shadow: 0 0 30px var(--neon-color);
-  }
-  .card h2 {
-    margin-top: 0;
-    font-size: 1.5rem;
-    background: linear-gradient(45deg, var(--neon-color), var(--primary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .button {
-    display: inline-block;
-    padding: 10px 20px;
-    background-color: transparent;
-    border: 2px solid var(--neon-color);
-    border-radius: 8px;
-    color: #fff;
-    cursor: pointer;
-    font-size: 1rem;
-    margin-top: 15px;
-    transition: background-color 0.3s, transform 0.2s;
-  }
-  .button:hover {
-    background-color: var(--neon-color);
-    color: #000;
-    transform: scale(1.05);
-  }
-  footer {
-    margin-top: auto;
-    padding: 20px;
-    font-size: 0.9rem;
-    color: #888;
-  }
-  @keyframes flicker {
-    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
-      opacity: 1;
-    }
-    20%, 22%, 24%, 55% {
-      opacity: 0.3;
-    }
-  }
-  .neon-text {
-    color: var(--neon-color);
-    font-size: 1.2rem;
-    animation: flicker 1.5s infinite alternate;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Услуги рядом</title>
+  <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
-
-<h1>Киберпанк Мир</h1>
-
-<div class="card">
-  <h2>Профиль</h2>
-  <p class="neon-text">Городская тень и неоновые лучи</p>
-  <button class="button">Войти</button>
-</div>
-
-<div class="card">
-  <h2>Функции</h2>
-  <ul>
-    <li>Адаптивный дизайн</li>
-    <li>Неоновое освещение</li>
-    <li>Динамическая анимация</li>
-  </ul>
-  <button class="button">Начать</button>
-</div>
-
-<footer>
-  <p>&copy; 2023 Киберпанк Стиль</p>
-</footer>
-
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-<script>
-  lucide.createIcons();
-</script>
+  <header class="header">
+    <h1>Услуги рядом</h1>
+  </header>
+  <main class="cards-container">
+    <div class="card">
+      <h2>Ремонт</h2>
+      <p>Предложения по ремонту рядом с вами</p>
+    </div>
+    <div class="card">
+      <h2>Установка</h2>
+      <p>Мастера по монтажу рядом с вами</p>
+    </div>
+    <div class="card">
+      <h2>Уборка</h2>
+      <p>Профессиональные услуги по уборке</p>
+    </div>
+    <div class="card">
+      <h2>Обучение</h2>
+      <p>Курсы и мастерклассы поблизости</p>
+    </div>
+  </main>
+  <nav class="bottom-nav">
+    <button class="nav-btn active">Главное</button>
+    <button class="nav-btn">Каталог</button>
+    <button class="nav-btn">Профиль</button>
+  </nav>
+  <script src="script.js"></script>
 </body>
 </html>
