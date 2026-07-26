@@ -76,23 +76,20 @@
   }
 
   async function attachImagesToUser(text, atts) {
-    // Один кадр — чтобы input у всех delegates был бюджетный даже с большой
-    // картинкой-скриншотом (Multi-AI запускается сразу для 2–3 моделей, поэтому
-    // каждая base64-строка картинки множится на кол-во делегатов).
+    // Картинки уже обработаны в `uploadOne` (paste-handler): всегда
+    // downsample до 1024px JPEG q=0.78 при аттаче. Здесь только sanity-cap:
+    // если кто-то протолкнул картинку >300КБ напрямую (мимо paste-handler),
+    // дропаем с явным текстовым предупреждением для модели.
     const imgs = (atts || []).filter(a => a && /^image\//i.test(a.type || '') && a.dataUrl).slice(0, 1);
     if (!imgs.length) return text;
     const parts = [];
     if (text) parts.push({ type: 'text', text });
     for (const a of imgs) {
-      // ВСЕГДА downsample до 1024px JPEG q=0.78. Это удерживает base64 ≤100KB,
-      // а tokens for image ≈ 1–4K. Без этого APK/скриншот сразу бьёт
-      // VseGPT soft-limit 0.07₽ (вместо 'text' модели с 0₽ у vision-base).
-      let url = await downsampleImage(a.dataUrl, 1024, 0.78);
-      if (url.length > 250000) {
+      if (a.dataUrl.length > 300000) {
         const name = a.name || a.path || 'image';
-        parts.push({ type: 'text', text: '[Изображение ' + name + ' слишком большое после сжатия — модели его не видят, просим описать задачу текстом]' });
+        parts.push({ type: 'text', text: '[Изображение ' + name + ' слишком большое для контекста — модели его не видят, опишите задачу текстом]' });
       } else {
-        parts.push({ type: 'image_url', image_url: { url } });
+        parts.push({ type: 'image_url', image_url: { url: a.dataUrl } });
       }
     }
     return parts;
@@ -2827,6 +2824,23 @@
   (function bindAttachments() {
     const inputBox = document.querySelector('.input-box');
     if (!inputBox) return;
+    if (!document.getElementById('attachChipCss')) {
+      const css = document.createElement('style');
+      css.id = 'attachChipCss';
+      css.textContent = '/* image attach chip — кард-превью с миниатюрой + оценкой токенов */'
+        + '.attach-chips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px 0;}'
+        + '.attach-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;max-width:320px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;font-size:12px;color:#cfd6e4;}'
+        + '.attach-chip:hover{background:rgba(255,255,255,0.07);}'
+        + '.attach-chip.chip-image{padding-right:6px;}'
+        + '.attach-thumb{width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#0e1320;}'
+        + '.attach-chip-text{display:inline-flex;align-items:center;gap:4px;min-width:0;overflow:hidden;}'
+        + '.attach-chip-text strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;}'
+        + '.attach-chip-text em{color:#8b95a8;font-size:11px;font-style:normal;}'
+        + '.attach-chip-text .tok{color:#7fb069;font-size:10.5px;font-family:ui-monospace,monospace;}'
+        + '.attach-chip-x{width:18px;height:18px;border:none;background:transparent;color:#8b95a8;cursor:pointer;border-radius:4px;flex-shrink:0;font-size:16px;line-height:1;padding:0;}'
+        + '.attach-chip-x:hover{background:rgba(255,255,255,0.08);color:#fff;}';
+      document.head.appendChild(css);
+    }
 
     const filePicker = document.createElement('input');
     filePicker.type = 'file'; filePicker.multiple = true; filePicker.style.display = 'none';
@@ -2868,11 +2882,17 @@
       const path = stampPath(file.name);
       const rawDataUrl = await fileToBase64(file);
       const isImage = /^image\//i.test(file.type || '');
-      // Большие картинки сразу ресайзим, чтобы dataUrl не раздувал контекст LLM
-      // (см. attachImagesToUser) и не возвращал 216k-chars «input too long».
+      // Картинки ВСЕГДА downsample-им до 1024px JPEG q=0.78 на attach-этапе —
+      // это держит dataUrl ≤80КБ (≈2–3K токенов в vision-input; мягко для
+      // soft-limit 0.07₽). downsample-image сам no-op-ит, если уже ≤1024px
+      // и base64 меньше порога — паста мелкого PNG-иконки пройдёт без потерь.
       let dataUrl = rawDataUrl;
-      if (isImage && dataUrl.length > 600000) {
-        dataUrl = await downsampleImage(dataUrl, 1280, 0.75);
+      let resized = false;
+      if (isImage) {
+        const out = await downsampleImage(rawDataUrl, 1024, 0.78);
+        if (out && out.length && out.length < rawDataUrl.length) {
+          dataUrl = out; resized = true;
+        }
       }
       const b64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
       const r = await fetch('/api/workspace/upload', {
@@ -2887,18 +2907,34 @@
         name: file.name,
         type: file.type || '',
         dataUrl: isImage ? dataUrl : null,
-        resized: dataUrl.length < rawDataUrl.length
+        resized,
+        rawSize: rawDataUrl.length,
+        finalSize: dataUrl.length,
       };
     }
     function render() {
       const list = pending.map((p, i) => {
         if (p.type === 'select-element') {
-          // Текст чипа обёрнут в .attach-chip-text — он сжимается и получает
-          // ellipsis при длинном имени. Кнопка «×» живёт снаружи, всегда видна.
           return `<span class="attach-chip chip-select" data-i="${i}" title="Выбран: ${escHtml(p.name)}"><span class="attach-chip-text">⌖ ${escHtml(p.name)}</span><button type="button" class="attach-chip-x" data-i="${i}" title="Убрать">×</button></span>`;
         }
-        const icon = isImage(p.path) ? '🖼' : '📎';
         const fname = p.path.split('/').pop();
+        if (/^image\//i.test(p.type || '') && p.dataUrl) {
+          // Image-card preview: thumbnail + compression summary + token estimate.
+          // Используем 768px JPEG q=0.78 → ≈2–3K токенов, что под 0.07₽ даже
+          // на gpt-4.1-nano (≈0.04₽ за запрос). Картинки без dataUrl (legacy
+          // персистенс) — показываем без превью, чтобы не порвать UI.
+          const thumb = p.dataUrl;
+          const szRaw = fmtSize(p.size || 0);
+          const szFinal = fmtSize(p.finalSize || (p.dataUrl ? p.dataUrl.length : 0));
+          const estTokens = Math.max(80, Math.ceil((p.finalSize || (p.dataUrl ? p.dataUrl.length : 0)) / 3000));
+          const ar = (estTokens / 1000) * 0.015; // дешёвая vision-модель (gpt-4o-mini)
+          const arrow = p.resized ? `${szRaw} → ${szFinal}` : szFinal;
+          return `<span class="attach-chip chip-image" data-i="${i}" title="${escHtml(p.path)} — ${estTokens}ток → ~${ar.toFixed(3)}₽">`
+            + `<img class="attach-thumb" src="${thumb}" alt="${escHtml(fname)}">`
+            + `<span class="attach-chip-text">🖼 <strong>${escHtml(fname)}</strong> <em>${arrow}</em> <span class="tok">~${estTokens}ток · ~${ar.toFixed(3)}₽</span></span>`
+            + `<button type="button" class="attach-chip-x" data-i="${i}" title="Убрать вложение">×</button></span>`;
+        }
+        const icon = '📎';
         return `<span class="attach-chip" data-i="${i}" title="${escHtml(p.path)}"><span class="attach-chip-text">${icon} ${escHtml(fname)} <em>${fmtSize(p.size)}</em></span><button type="button" class="attach-chip-x" data-i="${i}" title="Убрать вложение">×</button></span>`;
       }).join('');
       chipRow.innerHTML = list;
