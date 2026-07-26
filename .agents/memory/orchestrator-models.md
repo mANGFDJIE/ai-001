@@ -12,4 +12,8 @@ Every model ID in `ORCHESTRATOR_MODELS` must have exactly one entry in `PRETTY` 
 **How to apply:** When adding/removing a model in `ORCHESTRATOR_MODELS`, update both `PRETTY` and `STRENGTHS` in `updateOrchestratorActiveModel()` in lockstep.
 
 ## max_tokens
-Set to 8192 for both orchestration calls and streaming. 4096 is too short for full application code generation.
+Do not use a fixed large completion limit with VseGPT: its soft per-query price check includes the requested completion size. Calculate a conservative limit from the actual serialized prompt and model price, with a server-side cap as a final guard.
+
+**Why:** A fixed `8192` request was rejected before generation when the account limit was `0.07₽`, even for otherwise valid short prompts.
+
+**How to apply:** Keep the client budget calculation and server proxy cap in sync when changing model pricing, prompt size, or orchestration flow.

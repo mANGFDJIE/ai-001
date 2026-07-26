@@ -472,6 +472,13 @@ app.post('/api/chat/openai', (req, res) => {
 
   const { messages, model, max_tokens } = req.body;
   if (!messages) return res.status(400).json({ error: 'messages required' });
+  // VseGPT performs a pre-flight soft-limit check using the requested
+  // completion size. Never let an omitted or stale client value turn into
+  // an 8K-token request that is rejected before streaming starts.
+  const requestedMaxTokens = Number(max_tokens);
+  const safeMaxTokens = Number.isFinite(requestedMaxTokens)
+    ? Math.max(128, Math.min(1536, Math.floor(requestedMaxTokens)))
+    : 512;
 
   const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');
   const url = new URL(baseURL + '/chat/completions');
@@ -488,7 +495,7 @@ app.post('/api/chat/openai', (req, res) => {
     model: model || 'deepseek-chat',
     messages,
     stream: true,
-    max_tokens: max_tokens || 8192
+    max_tokens: safeMaxTokens
   });
 
   const options = {

@@ -36,8 +36,8 @@
     el.classList.toggle('is-running', !!v);
   }
   // Короткий промпт для slim multi-запросов (≤400 токенов) — не превышает per-query лимит VseGPT 0.060₽
-  const SLIM_SYSTEM_PROMPT = 'You are an AI coding agent. Code blocks MUST start with file marker: `// file: index.html` or `<!-- file: index.html -->`. Defaults: HTML→index.html, CSS→styles.css, JS→script.js. Output plain HTML+CSS+JS only (no React/Next/TS build steps). For mobile UI: 375px viewport, gradient header, bottom tab nav, rounded cards (16-24px), premium look. Max 2-4 prose sentences. Reply in Russian if asked in Russian.';
-const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS only. Every code block MUST start with file marker: // file: path or <!-- file: path --> in its first line. Defaults: index.html, styles.css, script.js. No React/Next/TS unless explicitly requested. Mobile UI: 375-430px viewport, gradient header, bottom tab nav, rounded cards (16-24px), premium look. Landing pages: hero, bento grid, features, CTA. Max 2-4 prose sentences. No intros, no follow-up questions. Reply in Russian. If a target file is explicitly specified, edit only that file.';
+  const SLIM_SYSTEM_PROMPT = 'You are an AI coding agent. Code blocks MUST start with `// file: path` or `<!-- file: path -->`. Use plain HTML+CSS+JS unless explicitly asked otherwise. Keep prose to 2-4 sentences. Reply in Russian if asked in Russian.';
+  const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS. Every code block MUST start with `// file: path` or `<!-- file: path -->`. No React/Next/TS unless explicitly requested. Keep prose to 2-4 sentences, with no intro or follow-up questions. Reply in Russian. If a target file is specified, edit only that file.';
 
   const LLM_SYSTEM_PROMPT = 'You are an autonomous AI coding agent embedded in a web-based IDE. You build modern web apps, landing pages, dashboards, and full-stack applications.\n\n=== CODE OUTPUT (REQUIRED) ===\nWhen you return ANY code for a file, you MUST include a path marker — one of two ways:\n(1) in the info-string: ```html // file: index.html\n(2) first line inside the block: // file: index.html  OR  <!-- file: index.html -->\nWithout the marker the file will NOT save to workspace. Marker is REQUIRED for any code that lands on disk.\nDefault auto-naming: HTML → index.html, CSS → styles.css, JS → script.js, JSON → data.json.\nIf the file already exists in workspace, EDIT it — do not create a duplicate.\n\n=== PREVIEW ENVIRONMENT (CRITICAL) ===\nThe preview is a STATIC Express server that serves plain HTML/CSS/JS files from workspace/preview/.\nDO NOT generate React, Next.js, Vue, Svelte, TypeScript (.tsx/.jsx/.ts) files — they CANNOT be rendered.\nNEVER output paths like app/page.tsx, pages/index.tsx, src/App.jsx — these will show as raw code, not a page.\nALWAYS output: index.html (+ styles.css + script.js if needed). One self-contained HTML file works best.\nExceptions: only use JSX/TSX if the user explicitly says "React project" AND the workspace already has package.json with React.\n\n=== MODERN STACK (HTML-first defaults) ===\n• Structure: single index.html with embedded or linked CSS/JS — fully self-contained, no build step\n• CSS: modern CSS (custom properties, grid, flexbox, container queries, @keyframes) — NO Tailwind unless CDN-linked\n• JS: vanilla ES6+ with CDN libraries where needed (e.g. <script src="https://unpkg.com/...">)\n• Design: dark theme by default; Google Fonts via <link>; smooth CSS transitions; glassmorphism/neumorphism if "modern" requested\n• Icons: Lucide via CDN (<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js">) or inline SVG\n• Palette: sophisticated dark (#0a0a0f bg, #7c3aed accent) or premium light — avoid basic neon unless cyberpunk requested\n• Landing pages: hero with gradient text, bento grid, feature cards, social proof section, CTA — Vercel/Linear/Stripe aesthetic\n• Components: fully functional, not placeholder — real interactivity with JS where needed\n• Mobile-first responsive: use CSS clamp(), min(), max() for fluid typography; media queries for layout\n\n=== MOBILE UI LEVEL (REQUIRED) ===\nThe user expects production-quality mobile app interfaces comparable to the attached screenshots: polished profile cards, marketplace service cards, bottom tab navigation, gradient backgrounds, rounded corners, soft shadows, clear hierarchy, and premium feel. When asked for a mobile UI or mini-app, you MUST deliver at least this level:\n• Full mobile viewport simulation (width ~375-430px), centered on desktop, full bleed on mobile.\n• Header card with large gradient or photo + avatar, name, status badge, stats row (likes, views, matches).\n• Rounded large cards (border-radius 16-24px) with soft shadows, clear sections, and ample whitespace.\n• Bottom tab navigation with 3-5 icons and active state indicator.\n• Top-tier typography: bold headings, subtle labels, harmonious Russian text.\n• Material 3 / iOS style: switch toggles, list items with chevrons, icons from Lucide.\n• Color: either vibrant gradient (pink, blue, purple) or premium dark theme; avoid flat, ugly, default browser styles.\n• If a screenshot/reference is attached, replicate its visual structure, proportions, and color mood — not just the layout idea.\n\n=== TONE (STRICT) ===\nWrite like a Replit agent engineer. Max 2-4 prose sentences. No leads (Let us, Well, Currently I, I will review, We should, Here is my plan, Let us begin). No explaining the obvious. No follow-up questions.\nFormat: what changed (filename — one-line gist, comma-separated if multiple). If error: one sentence on what failed.\n\n=== TARGET-FILE RULE ===\nWhen user-content carries a [🎯 ЦЕЛЬ ОПЕРАЦИИ] block with explicit Fayl-cel: ...path.ext, edit STRICTLY that file. Do not ask which file. Just modify it.\n\n=== SELECTED-ELEMENT HINT ===\nIf user mentions ⌖ <tag> in their text, treat it as a soft pointer to the attached selected-element chip. Use pagePath from the chip, not inferred from tag.\n\nReply in Russian if the request is in Russian.\n';
 
@@ -1552,8 +1552,32 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
     const remaining = budgetRub - promptCost;
     if (remaining <= 0) return 256;
     // Vision-модели: картинка жрёт токены, completion ограничиваем жёстче
-    const hardCap = m.vision ? 1024 : 2048;
+    // VseGPT enforces a soft per-query price limit before generation. Keep
+    // completion conservative; a long prompt already consumes most of 0.07₽.
+    const hardCap = m.vision ? 768 : 1024;
     return Math.max(256, Math.min(hardCap, Math.floor((remaining / m.completion) * 1000)));
+  }
+
+  function estimatePromptTokens(messages) {
+    try {
+      // Conservative approximation for text. Base64 image payloads are
+      // intentionally counted too, so large images get a small completion
+      // budget instead of being rejected by VseGPT pre-flight pricing.
+      return Math.max(1, Math.ceil(JSON.stringify(messages || []).length / 4));
+    } catch {
+      return 1500;
+    }
+  }
+
+  function budgetedMaxTokens(modelId, messages, requested = 1024) {
+    const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
+    if (!m || !m.completion) return Math.max(128, Math.min(512, requested));
+    const promptTokens = estimatePromptTokens(messages);
+    const promptCost = (m.prompt * promptTokens) / 1000;
+    const remaining = BUDGET_RUB - promptCost;
+    if (remaining <= 0) return 128;
+    const hardCap = m.vision ? 768 : 1536;
+    return Math.max(128, Math.min(hardCap, requested, Math.floor((remaining / m.completion) * 1000)));
   }
 
   function orchestratorPrompt(mode) {
@@ -1610,12 +1634,13 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
     });
   }
 
-  async function callOpenAI(model, messages, maxTokens = 8192) {
+  async function callOpenAI(model, messages, maxTokens = 1024) {
     return rateLimitedApiCall(async () => {
+    const safeMaxTokens = budgetedMaxTokens(model, messages, maxTokens);
     const resp = await fetch('/api/chat/openai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, max_tokens: maxTokens })
+      body: JSON.stringify({ model, messages, max_tokens: safeMaxTokens })
     });
     if (!resp.ok) {
       let detail = '';
@@ -1714,12 +1739,12 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
     let routerResp = '';
     let routerR;
     try {
-      const historyMessages = await attachHistory(false);
       routerR = await callOpenAI(routerModel, [
         { role: 'system', content: orchestratorPrompt(mode) },
-        ...historyMessages,
+        // The router only classifies the current request. History and project
+        // files needlessly increase VseGPT's pre-flight price calculation.
         { role: 'user', content: await userContentFor(content, attachments, false) }
-      ]);
+      ], 512);
     } catch (err) {
       onStep && onStep('Маршрутизатор недоступен: ' + err.message);
       return { text: '', error: 'Маршрутизатор gpt-4.1-nano: ' + err.message, model: routerModel };
@@ -2038,7 +2063,7 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
       if (selectedPreset.local || currentModel === 'local') {
         if (labelEl) labelEl.textContent = 'Модель загружается на сервере…';
         try {
-          const contextMessages = await buildWorkspaceContextMessages();
+           const contextMessages = await buildWorkspaceContextMessages();
           const resp = await fetch('/api/chat/local', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2122,15 +2147,15 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
             // а не UI-ключ (openai-chat / deepseek-reasoner) — иначе upstream вернёт model-not-found.
             const apiModel = selectedPreset.apiModel || currentModel;
           const contextMessages = await buildWorkspaceContextMessages();
-          const resp = await fetch('/api/chat/openai', {
+            const resp = await fetch('/api/chat/openai', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               model: apiModel,
               messages: [
-                { role: 'system', content: LLM_SYSTEM_PROMPT },
+                 { role: 'system', content: COMPACT_SYSTEM_PROMPT },
                 ...contextMessages,
-                ...await Promise.all(history.map(async (m, i, arr) => {
+                ...await Promise.all(history.slice(-3).map(async (m, i, arr) => {
                   const last = i === arr.length - 1 && m.role === 'user';
                   // Только текущее сообщение отправляем с картинками;
                   // исторические картинки заменяем на текстовое описание,
@@ -2146,7 +2171,7 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
                   return { role: m.role, content };
                 }))
               ],
-              max_tokens: 8192
+              max_tokens: 700
             }),
             signal: chatAbort ? chatAbort.signal : undefined
           });
