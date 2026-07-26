@@ -1125,7 +1125,6 @@
         <span class="status-text">Думаю…</span>
         ${modelName ? `<span class="model-tag">${modelName}</span>` : ''}
       </div>
-      <div class="acti-live"></div>
       <div class="load-bar"><div class="load-bar-fill"></div></div>`;
     messagesEl.appendChild(div);
     scrollBottom();
