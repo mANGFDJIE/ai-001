@@ -494,19 +494,32 @@ body {
 }
 
 .input-box {
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--radius);
   padding: 7px 9px 5px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--bg3);
+  background:
+    linear-gradient(var(--bg3), var(--bg3)) padding-box,
+    conic-gradient(
+      from var(--border-angle),
+      #3b82f6 0deg,
+      #22d3ee 90deg,
+      #10b981 180deg,
+      #22d3ee 270deg,
+      #3b82f6 360deg
+    ) border-box;
+  animation: flow-border 4s linear infinite;
   z-index: 0;
 }
 
 .input-box:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  animation-duration: 2.5s;
+}
+
+@keyframes flow-border {
+  to { --border-angle: 360deg; }
 }
 
 textarea {
