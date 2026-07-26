@@ -1458,8 +1458,10 @@
   //   reasoning-> пошаговое планирование.
   // Ordered by cost (ascending) — router prefers cheapest model that can handle the task.
   // Falls back up the list on budget/availability errors (isBudgetOrModelError).
-  // Бюджет на один запрос (руб). Жёсткий лимит: один запрос не дороже 0.06₽.
-  const BUDGET_RUB = 0.06;
+  // Бюджет на один запрос (руб). С учётом минимальной цены vision-запроса в VseGPT
+  // (~0.09₽) и запасом на retry — лимит 0.1₽. В настройках VseGPT должен быть
+  // установлен такой же или больший лимит.
+  const BUDGET_RUB = 0.1;
   // Цены prompt/completion в ₽ за 1000 токенов — актуальны для VseGPT.ru.
   // Статический ростер: только дешёвые vision-модели для кода/UI/скриншотов.
   // Мульти-AI отключён.
