@@ -905,9 +905,36 @@ async function refreshScout() {
       .sort((a, b) => (b.score - a.score) || ((a.prompt + a.completion) - (b.prompt + b.completion)))
       .slice(0, 30);
     if (!curated.length) return;
-    await writeRosterState({ scout: curated, scoutAt: Date.now(), model: SCOUT_MODEL });
-    console.log('[scout] ростер обновлён:', curated.length, 'моделей' +
-      (scoreMap.size ? ` (top=${curated[0].score}, min=${curated[curated.length-1].score})` : ' [heuristic-only]'));
+    // Гарантируем наличие Claude-аналогов в ростере, даже если провайдер в
+    // этом часу их не вернул в /v1/models. Подобрано под наш сценарий:
+    // vision (читать картинку → строить страницу 1:1), coder (сложный UI/TMA),
+    // укладывается в бюджет ≤0.06₽/1K (любой запрос ≤0.07₽).
+    const CLAUDE_ANALOGS_FALLBACK = [
+      { id: 'anthropic/claude-3-5-sonnet-20241022',     vision: true, coding: true, prompt: 0.018, completion: 0.045, score: 9 },
+      { id: 'anthropic/claude-3-5-sonnet-20240620',     vision: true, coding: true, prompt: 0.018, completion: 0.045, score: 9 },
+      { id: 'anthropic/claude-3-haiku-20240307',        vision: true, coding: true, prompt: 0.005, completion: 0.025, score: 8 },
+      { id: 'openai/gpt-4o',                            vision: true, coding: true, prompt: 0.03,  completion: 0.09,  score: 9 },
+      { id: 'openai/gpt-4o-mini',                       vision: true, coding: true, prompt: 0.005, completion: 0.015, score: 9 },
+      { id: 'google/gemini-2.5-flash-pre',              vision: true, coding: true, prompt: 0.018, completion: 0.054, score: 9 },
+      { id: 'google/gemini-2.5-flash',                  vision: true, coding: true, prompt: 0.015, completion: 0.06,  score: 7 },
+      { id: 'mistralai/pixtral-12b-2409',               vision: true, coding: true, prompt: 0.025, completion: 0.025, score: 8 },
+      { id: 'qwen/qwen-2.5-vl-72b-instruct',            vision: true, coding: true, prompt: 0.04,  completion: 0.04,  score: 7 },
+      { id: 'meta-llama/llama-3.2-90b-vision-instruct', vision: true, coding: true, prompt: 0.05,  completion: 0.05,  score: 6 },
+      { id: 'xai/grok-2-vision-1212',                   vision: true, coding: true, prompt: 0.05,  completion: 0.05,  score: 6 },
+    ];
+    const curatedIds = new Set(curated.map(c => c.id));
+    const mergedRoster = curated.slice();
+    for (const fb of CLAUDE_ANALOGS_FALLBACK) {
+      if (curatedIds.has(fb.id)) continue;
+      if (fb.prompt + fb.completion > 0.06) continue; // жёстче BUDGET_RUB
+      mergedRoster.push(fb);
+    }
+    const finalRoster = mergedRoster
+      .sort((a, b) => (b.score - a.score) || ((a.prompt + a.completion) - (b.prompt + b.completion)))
+      .slice(0, 40);
+    await writeRosterState({ scout: finalRoster, scoutAt: Date.now(), model: SCOUT_MODEL });
+    console.log('[scout] ростер обновлён:', finalRoster.length, 'моделей (+fallback)', +
+      (scoreMap.size ? `top=${finalRoster[0]?.score}` : '[heuristic-only]'));
   } catch (e) { console.warn('[scout] refresh failed:', e.message); }
 }
 
