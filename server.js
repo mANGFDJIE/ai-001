@@ -564,13 +564,6 @@ app.post('/api/chat/openai', (req, res) => {
   const safeMaxTokens = Number.isFinite(requestedMaxTokens)
     ? Math.max(128, Math.min(1536, Math.floor(requestedMaxTokens)))
     : 512;
-  // VseGPT performs a pre-flight soft-limit check using the requested
-  // completion size. Never let an omitted or stale client value turn into
-  // an 8K-token request that is rejected before streaming starts.
-  const requestedMaxTokens = Number(max_tokens);
-  const safeMaxTokens = Number.isFinite(requestedMaxTokens)
-    ? Math.max(128, Math.min(1536, Math.floor(requestedMaxTokens)))
-    : 512;
 
   const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');
   const url = new URL(baseURL + '/chat/completions');
