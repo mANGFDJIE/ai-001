@@ -2403,6 +2403,18 @@
                 full = stripCodeFromChat(full, oChanges);
               }
             }
+            // Финализируем — отрисовываем ответ в чате, сохраняем историю
+            const elapsed = Math.max(1, Math.round((Date.now() - start) / 1000));
+            finalizeStreaming(thinkEl, full || '⚠️ Пустой ответ', elapsed, decoration, !full);
+            saveMessages('assistant', full || '', { model: 'perplexity-multi-router' });
+            // Обновляем предпросмотр, если созданы файлы
+            if (typeof reloadPreview === 'function' && full && (!full.startsWith('⚠️'))) {
+              setTimeout(reloadPreview, 300);
+            }
+            sending = false;
+            sendBtn.disabled = false;
+            setStopVisible(false);
+            return;
           } else {
             // ── Прямой SSE-стрим к выбранной модели ────────────────
             // Шлём реальный id модели у провайдера, а не UI-ключ — иначе upstream вернёт model-not-found.

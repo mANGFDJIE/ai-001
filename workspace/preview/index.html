@@ -1,28 +1,66 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
 <title>Услуги рядом</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header class="app-header">
-<h1>Услуги рядом</h1>
-<input type="search" id="searchInput" placeholder="Искать..." aria-label="Искать">
+<header class="hero">
+  <h1 class="hero-title">Услуги рядом</h1>
+  <p class="hero-subtitle">Найдём мастера за 5 минут</p>
+  <div class="search-bar">
+    <input type="text" id="search" placeholder="Поиск услуг…">
+  </div>
 </header>
-<main class="card-grid" id="cardGrid"></main>
 
-<div class="modal" id="modal" hidden>
-<div class="modal-content">
-<span class="close" id="modalClose">&times;</span>
-<h2 id="modalTitle"></h2>
-<img id="modalImage" src="" alt="">
-<p id="modalText"></p>
+<main class="main">
+  <section class="grid">
+    <article class="card" data-title="Ремонт компьютеров">
+      <img src="https://source.unsplash.com/featured/?computer" alt="Ремонт компьютеров">
+      <div class="card-content">
+        <h3>Ремонт компьютеров</h3>
+        <p class="tag">Техник за 5 минут</p>
+      </div>
+    </article>
+    <article class="card" data-title="Уборка квартир">
+      <img src="https://source.unsplash.com/featured/?cleaning" alt="Уборка квартир">
+      <div class="card-content">
+        <h3>Уборка квартир</h3>
+        <p class="tag">Гарантия 100%</p>
+      </div>
+    </article>
+    <article class="card" data-title="Доставка еды">
+      <img src="https://source.unsplash.com/featured/?delivery" alt="Доставка еды">
+      <div class="card-content">
+        <h3>Доставка еды</h3>
+        <p class="tag">Быстро и вкусно</p>
+      </div>
+    </article>
+    <article class="card" data-title="Грузоперевозки">
+      <img src="https://source.unsplash.com/featured/?transport" alt="Грузоперевозки">
+      <div class="card-content">
+        <h3>Грузоперевозки</h3>
+        <p class="tag">Выгодные цены</p>
+      </div>
+    </article>
+  </section>
+</main>
+
+<div class="bottom-nav">
+  <button class="nav-btn">Главная</button>
+  <button class="nav-btn">Категории</button>
+  <button class="nav-btn">Профиль</button>
 </div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-content">
+    <h2 id="modal-title"></h2>
+    <p id="modal-description"></p>
+    <button id="close-modal">Закрыть</button>
+  </div>
 </div>
 
 <script src="script.js"></script>
