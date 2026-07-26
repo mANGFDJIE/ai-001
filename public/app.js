@@ -140,24 +140,26 @@
       openai: true,
     };
 
-    // ⭐ Gemini multi — использует Google Gemini API (бесплатно, 1500 запр/день)
-    // как роутер и делегаты. Доступен только если есть GEMINI_API_KEY.
+    // ⭐ Gemini DIRECT — как я (Replit Agent): одна сильная модель, детальный промпт,
+    // без роутера, без multi. Запрос → Gemini → код → файлы → превью → чистый чат.
+    // Доступен только если есть GEMINI_API_KEY.
     if (config.hasGemini) {
-      modelPresets['gemini-multi-router'] = {
-        name: 'Gemini 2.5 Pro · Мульти AI',
-        label: 'Gemini 2.5 Pro · Мульти AI',
-        desc: 'Google AI Studio (бесплатно 1500 запр/день). Топ кодинг',
+      modelPresets['gemini-direct'] = {
+        name: '⚡ Gemini 2.5 Pro Direct',
+        label: 'Gemini 2.5 Pro Direct',
+        desc: 'Как Replit Agent. Одна сильная модель, без роутера, максимальное качество',
         color: 'pro',
         featured: true,
-        router: 'multi',
         openai: true,
+        apiModel: 'gemini-2.5-pro',
+        directVision: true,
       };
     }
 
-    // Устанавливаем режим Gemini multi по умолчанию, если есть ключ Gemini.
+    // Устанавливаем Gemini Direct по умолчанию, если есть ключ Gemini.
     // Иначе Мульти AI на Perplexity.
     if (!modelPresets[currentModel] || currentModel === DEFAULT_MODEL_KEY) {
-      currentModel = config.hasGemini ? 'gemini-multi-router' : 'perplexity-multi-router';
+      currentModel = config.hasGemini ? 'gemini-direct' : 'perplexity-multi-router';
     }
 
     renderModelDropdown();
@@ -2374,8 +2376,13 @@
             // Шлём реальный id модели у провайдера, а не UI-ключ — иначе upstream вернёт model-not-found.
             const apiModel = selectedPreset.apiModel || currentModel;
             const contextMessages = await buildWorkspaceContextMessages();
+            // Для Gemini Direct используем детальный промпт (как у Replit Agent).
+            // Для других моделей — короткий COMPACT_SYSTEM_PROMPT.
+            const systemPrompt = selectedPreset.name && selectedPreset.name.includes('Gemini')
+              ? LLM_SYSTEM_PROMPT
+              : COMPACT_SYSTEM_PROMPT;
             const messages = [
-              { role: 'system', content: COMPACT_SYSTEM_PROMPT },
+              { role: 'system', content: systemPrompt },
               ...contextMessages,
               ...await Promise.all(history.slice(-3).map(async (m, i, arr) => {
                 const last = i === arr.length - 1 && m.role === 'user';
