@@ -1,4 +1,3 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const app = document.getElementById('app');
-    app.innerHTML = `<h1>Услуги рядом</h1>`;
+document.getElementById('clickMe').addEventListener('click', function() {
+    alert('Кнопка нажата!');
 });

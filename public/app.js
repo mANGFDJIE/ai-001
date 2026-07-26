@@ -76,20 +76,21 @@
   }
 
   async function attachImagesToUser(text, atts) {
-    const imgs = (atts || []).filter(a => a && /^image\//i.test(a.type || '') && a.dataUrl).slice(0, 2);
+    // Один кадр — чтобы input у всех delegates был бюджетный даже с большой
+    // картинкой-скриншотом (Multi-AI запускается сразу для 2–3 моделей, поэтому
+    // каждая base64-строка картинки множится на кол-во делегатов).
+    const imgs = (atts || []).filter(a => a && /^image\//i.test(a.type || '') && a.dataUrl).slice(0, 1);
     if (!imgs.length) return text;
     const parts = [];
     if (text) parts.push({ type: 'text', text });
     for (const a of imgs) {
-      let url = a.dataUrl;
-      if (url.length > 400000) {
-        url = await downsampleImage(url, 768, 0.7);
-      }
-      if (url.length > 600000) {
-        // Даже после downsample картинка огромная — не пихаем её в контекст,
-        // только текстовое предупреждение для модели.
+      // ВСЕГДА downsample до 1024px JPEG q=0.78. Это удерживает base64 ≤100KB,
+      // а tokens for image ≈ 1–4K. Без этого APK/скриншот сразу бьёт
+      // VseGPT soft-limit 0.07₽ (вместо 'text' модели с 0₽ у vision-base).
+      let url = await downsampleImage(a.dataUrl, 1024, 0.78);
+      if (url.length > 250000) {
         const name = a.name || a.path || 'image';
-        parts.push({ type: 'text', text: '[Изображение ' + name + ' не прикреплено: превышает контекстное окно модели]' });
+        parts.push({ type: 'text', text: '[Изображение ' + name + ' слишком большое после сжатия — модели его не видят, просим описать задачу текстом]' });
       } else {
         parts.push({ type: 'image_url', image_url: { url } });
       }
@@ -1947,6 +1948,16 @@
       ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
     }
     const maxTokensList = allocateMaxTokens(ids, BUDGET_RUB, 600); // меньше токенов → ниже expected price
+    // С прикреплённой картинкой параллельный опрос утроит бюджет без пользы
+    // (base64-картинка × N делегатов → VseGPT soft-limit «Exceeded 275K→700 tokens
+    // expected price 9₽»). Принудительно — ONE-SHOT на самой дешёвой vision+coding.
+    if (hasImageAttachment && ids.length > 1) {
+      const best = ORCHESTRATOR_MODELS.find(m => m.vision && m.coding && isAvailableModel(m.id))
+                || ORCHESTRATOR_MODELS.find(m => m.vision && isAvailableModel(m.id))
+                || ORCHESTRATOR_MODELS[0];
+      ids = [best.id];
+      onStep && onStep('Картинка приложена — one-shot на ' + best.id + ' (multi утроит бюджет)');
+    }
     onStep && onStep('Параллельный опрос моделей…');
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const results = await Promise.all(ids.map(async (id, idx) => {
