@@ -483,18 +483,24 @@ app.post('/api/chat/openai', (req, res) => {
   const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');
   const url = new URL(baseURL + '/chat/completions');
 
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no'
-  });
-  res.flushHeaders();  // иначе Node буферит до highWaterMark и клиент видит всё одним куском
+  // НЕ streaming — многие модели VseGPT (claude-3-haiku и др.) не поддерживают
+  // stream: true. Для оркестратора и multi-запросов используем обычный JSON.
+  const isStream = req.body.stream === true;
+
+  if (isStream) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    });
+    res.flushHeaders();
+  }
 
   const body = JSON.stringify({
     model: model || 'deepseek-chat',
     messages,
-    stream: true,
+    stream: !!isStream,
     max_tokens: safeMaxTokens
   });
 
@@ -510,26 +516,50 @@ app.post('/api/chat/openai', (req, res) => {
   };
 
   const proxyReq = https.request(options, (proxyRes) => {
-    // Если апстрим вернул неуспешный статус — оборачиваем в SSE-ивент ошибки,
-    // чтобы клиент не молча показал пустой баббл.
+    // Если апстрим вернул неуспешный статус
     if (proxyRes.statusCode >= 400) {
       let errBody = '';
       proxyRes.on('data', (chunk) => { errBody += chunk; });
       proxyRes.on('end', () => {
         let msg = errBody;
         try { msg = JSON.parse(errBody).error?.message || errBody; } catch {}
-        res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
-        res.write('data: [DONE]\n\n');
+        if (isStream) {
+          res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+          res.write('data: [DONE]\n\n');
+        } else {
+          res.status(proxyRes.statusCode).json({ error: msg });
+        }
         res.end();
       });
       return;
     }
+    // Не-streaming: собираем JSON-ответ целиком и отдаём клиенту
+    if (!isStream) {
+      let body = '';
+      proxyRes.on('data', (chunk) => { body += chunk; });
+      proxyRes.on('end', () => {
+        try {
+          const json = JSON.parse(body);
+          if (json.error) return res.json({ error: json.error.message || json.error });
+          const text = json.choices?.[0]?.message?.content || '';
+          res.json({ text, model: json.model || model });
+        } catch (e) {
+          res.json({ error: 'Failed to parse upstream response: ' + body.slice(0, 200) });
+        }
+      });
+      return;
+    }
+    // Streaming: проксируем чанки SSE напрямую
     proxyRes.on('data', (chunk) => { res.write(chunk); });
     proxyRes.on('end', () => { res.end(); });
   });
   proxyReq.on('error', (err) => {
-    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-    res.write('data: [DONE]\n\n');
+    if (isStream) {
+      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+      res.write('data: [DONE]\n\n');
+    } else {
+      res.json({ error: err.message });
+    }
     res.end();
   });
   proxyReq.write(body);

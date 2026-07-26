@@ -1739,48 +1739,15 @@
     const resp = await fetch('/api/chat/openai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, max_tokens: safeMaxTokens })
+      body: JSON.stringify({ model, messages, max_tokens: safeMaxTokens, stream: false })
     });
+    const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      let detail = '';
-      try { detail = (await resp.text()).slice(0, 200); } catch {}
-      throw new Error('HTTP ' + resp.status + (detail ? ' · ' + detail : ''));
+      const errMsg = data.error || ('HTTP ' + resp.status);
+      return { text: '', error: errMsg, model };
     }
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '', full = '', errorMsg = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      let sep;
-      while ((sep = buf.search(/\r?\n\r?\n/)) !== -1) {
-        const event = buf.slice(0, sep);
-        buf = buf.slice(sep).replace(/^\r?\n\r?\n/, '');
-        for (const rawLine of event.split(/\r?\n/)) {
-          const line = rawLine.trim();
-          if (!line.startsWith('data:')) continue;
-          const data = line.slice(5).trim();
-          if (!data || data === '[DONE]') continue;
-          let parsed;
-          try { parsed = JSON.parse(data); } catch { continue; }
-          // Апстрим-ошибка в потоке (например, Rate-limit, e-mail not confirmed и т.п.)
-          if (parsed && parsed.error) {
-            errorMsg = (parsed.error && (parsed.error.message || parsed.error)) || JSON.stringify(parsed.error);
-            continue;
-          }
-          // Некоторые модели (DeepSeek-V4, gpt-5-mini с включённым reasoning) прячут
-          // часть ответа в `reasoning_content`, при этом `content` может быть null.
-          // Сливаем оба поля — чтобы роутер/делегат никогда не возвращал пустоту
-          // из-за внутреннего reasoning.
-          const reasonDelta = parsed.choices?.[0]?.delta?.reasoning_content || '';
-          const delta = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text || '';
-          if (reasonDelta) full += reasonDelta;
-          if (delta) full += delta;
-        }
-      }
-    }
-    return { text: full, error: errorMsg, model };
+    if (data.error) return { text: '', error: data.error, model };
+    return { text: data.text || '', model: data.model || model };
     });
   }
 
@@ -2411,7 +2378,8 @@
               body: JSON.stringify({
                 model: apiModel,
                 messages,
-                max_tokens: safeMaxTokens
+                max_tokens: safeMaxTokens,
+                stream: true
               }),
               signal: chatAbort ? chatAbort.signal : undefined
             });
