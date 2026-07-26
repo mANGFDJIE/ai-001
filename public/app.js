@@ -2394,9 +2394,15 @@
             } else {
               full = (reply && reply.text) || '';
             }
-            // Шапку возвращаем в нормальное AUTO-состояние (модель только что
-            // поработала, теперь снова ждёт следующего запроса).
-            try { setActiveModel(DEFAULT_MODEL_KEY, 'V0 — Llama 3.2 11B Vision'); } catch (_) {}
+            // Извлекаем файлы из ответа оркестратора и пишем в workspace,
+            // чтобы код не оставался только в чате.
+            if (full) {
+              const oChanges = extractCodeChanges(full);
+              if (oChanges.length) {
+                await applyCodeChanges(oChanges);
+                full = stripCodeFromChat(full, oChanges);
+              }
+            }
           } else {
             // ── Прямой SSE-стрим к выбранной модели ────────────────
             // Шлём реальный id модели у провайдера, а не UI-ключ — иначе upstream вернёт model-not-found.

@@ -1,38 +1,30 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Услуги рядом</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Услуги рядом</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <header class="header">
-      <h1>Услуги рядом</h1>
-      <input type="text" class="search-bar" placeholder="Поиск услуг..." />
-    </header>
-    <main class="cards-grid">
-      <div class="card">
-        <h2>Строительные работы</h2>
-        <p>Ремонт, укладка плитки, покраска</p>
-      </div>
-      <div class="card">
-        <h2>Уборка</h2>
-        <p>Ежедневная уборка, глубокая чистка</p>
-      </div>
-      <div class="card">
-        <h2>Дизайн</h2>
-        <p>Интерьер, ландшафтный дизайн</p>
-      </div>
-    </main>
-    <nav class="bottom-nav">
-      <button class="nav-tab active">Главная</button>
-      <button class="nav-tab">Контакты</button>
-      <button class="nav-tab">Профиль</button>
-    </nav>
-  </div>
-  <script src="script.js"></script>
+<header class="app-header">
+<h1>Услуги рядом</h1>
+<input type="search" id="searchInput" placeholder="Искать..." aria-label="Искать">
+</header>
+<main class="card-grid" id="cardGrid"></main>
+
+<div class="modal" id="modal" hidden>
+<div class="modal-content">
+<span class="close" id="modalClose">&times;</span>
+<h2 id="modalTitle"></h2>
+<img id="modalImage" src="" alt="">
+<p id="modalText"></p>
+</div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
