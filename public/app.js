@@ -1142,7 +1142,6 @@
       <div class="msg-agent-status">
         <div class="status-icon"><div class="spinner"></div></div>
         <span class="status-text">Думаю…</span>
-        ${modelName ? `<span class="model-tag">${modelName}</span>` : ''}
       </div>
       <div class="acti-live" hidden></div>
       <div class="load-bar"><div class="load-bar-fill"></div></div>`;
@@ -2254,11 +2253,16 @@
               if (labelEl) labelEl.textContent = status;
               // «Переход → model-id» — рендерим только новую модель, без дубля
               // с acti-step и/или телом.
-              const m = /^\s*Переход\s*→\s*([^\s..]+)/i.exec(status || '');
-              if (m) {
-                updateThinkingModel(thinkEl, m[1]);
-              } else {
-                updateThinkingModel(thinkEl, decoration + ' — ' + status);
+              // Параллельный статус не трогает .model-tag — иначе в живом пузырьке вылезет
+              // плашка «⭐ Мульти AI — Параллельный опрос моделей…». Шапка оркестратора
+              // и лента шагов уже обновляются на этом же событии.
+              if (!/^\s*Параллельный/i.test(status || '')) {
+                const m = /^\s*Переход\s*→\s*([^\s..]+)/i.exec(status || '');
+                if (m) {
+                  updateThinkingModel(thinkEl, m[1]);
+                } else {
+                  updateThinkingModel(thinkEl, decoration + ' — ' + status);
+                }
               }
               updateOrchestratorActiveModel(status);
               activityTracker.push(status);
