@@ -1470,6 +1470,10 @@
     { id: 'vis-openai/gpt-4o-mini',                       tier: 'vision', coding: true, vision: true, prompt: 0.037, completion: 0.15,  name: 'Copilot — GPT-4o mini',      desc: 'OpenAI vision + кодинг — аналог GitHub Copilot' },
     { id: 'vis-meta-llama/llama-4-scout',                 tier: 'vision', coding: true, vision: true, prompt: 0.05,  completion: 0.16,  name: 'Replit Agent — Llama 4 Scout', desc: 'Быстрый open-source vision-кодер с tools' },
     { id: 'vis-anthropic/claude-3-haiku',                 tier: 'vision', coding: true, vision: true, prompt: 0.066, completion: 0.30,  name: 'Claude 3 Haiku Vision',      desc: 'Антропик vision — аналог Claude' },
+    // Бесплатные модели VseGPT (Free-тариф)
+    { id: 'openai/gpt-oss-20b',                           tier: 'light', coding: true, vision: false, prompt: 0.014, completion: 0.06,  name: 'GPT-OSS 20B (Free)',         desc: 'Открытая модель OpenAI, tools, дешёвая' },
+    { id: 'google/gemma-4-31b-it',                       tier: 'mid',   coding: true, vision: true,  prompt: 0.045, completion: 0.13,  name: 'Gemma 4 31B (Free)',         desc: 'Google Gemma 4, vision+tools+structured' },
+    { id: 'cohere/command-r7b-12-2024',                   tier: 'light', coding: true, vision: false, prompt: 0.01,  completion: 0.025, name: 'North Mini Code (Free)',     desc: 'Cohere Command R7B, заточена под код' },
   ];
   // Активный ростер. Инициализируется baseline, потом обновляется через /api/models.
   let ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();

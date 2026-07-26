@@ -81,7 +81,10 @@ Sync идёт через **серверный proxy** (`/api/sync/*` в `server.
 | **Copilot — GPT-4o mini** | `vis-openai/gpt-4o-mini` | 0.037₽ / 0.15₽ | OpenAI coding assistant |
 | **Replit Agent — Llama 4 Scout** | `vis-meta-llama/llama-4-scout` | 0.05₽ / 0.16₽ | быстрый open-source vision-кодер |
 | **Claude 3 Haiku Vision** | `vis-anthropic/claude-3-haiku` | 0.066₽ / 0.30₽ | аналог Claude |
+| **GPT-OSS 20B (Free)** | `openai/gpt-oss-20b` | 0.014₽ / 0.06₽ | открытая модель OpenAI, tools |
+| **Gemma 4 31B (Free)** | `google/gemma-4-31b-it` | 0.045₽ / 0.13₽ | Google, vision+tools+structured |
+| **North Mini Code (Free)** | `cohere/command-r7b-12-2024` | 0.01₽ / 0.025₽ | от Cohere, заточена под код |
 
-Все модели — **vision**: умеют видеть картинки и генерировать код/вёрстку.
+Все модели отсортированы по стоимости (дешёвые выше). Ростер обновляется из каталога VseGPT при старте.
 
 Бюджет на один запрос: **0.1₽** (`BUDGET_RUB` в `public/app.js`). Минимальная цена vision-запроса в VseGPT ~0.09₽, поэтому лимит в настройках VseGPT должен быть **не меньше 0.1₽** (https://vsegpt.ru/User/SettingsModels → «Лимит: 1 запрос не должен стоить больше, чем X рублей»).
