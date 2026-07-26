@@ -119,14 +119,16 @@
         const modelsData = await mr.json();
         if (modelsData && Array.isArray(modelsData.data)) {
           refreshOrchestratorModels(modelsData.data);
+          rebuildDirectModelPresets();
+          renderModelDropdown();
         }
       } catch (e) { console.log('[models] авто-сканер не смог загрузить каталог:', e); }
     }
     if (config.hasOpenAI) {
       await scanModelCatalog();
-      // Повторный скан каждые 30 минут — ловим новые дешёвые модели и убираем исчезнувшие.
+      // Повторный скан каждый час — ловим новые дешёвые модели и убираем исчезнувшие.
       if (!window.__modelScanInterval) {
-        window.__modelScanInterval = setInterval(scanModelCatalog, 30 * 60 * 1000);
+        window.__modelScanInterval = setInterval(scanModelCatalog, 60 * 60 * 1000); // мониторинг каждый час
       }
     }
 
@@ -138,7 +140,7 @@
         local: true
       };
     }
-    // Если облачный провайдер доступен — по умолчанию стартуем с ⭐ Мульти-агент.
+    // Если облачный провайдер доступен — по умолчанию стартуем с ⭐ Мульти AI.
     if (config.hasOpenAI && (currentModel === 'auto' || currentModel === 'orchestrator' || currentModel === 'openai-chat' || currentModel === 'deepseek-reasoner' || currentModel.startsWith('featured-'))) {
       currentModel = 'multi';
     }
@@ -154,10 +156,10 @@
         router: 'auto',
         featured: true
       };
-      // ── Мульти-агент — всегда параллельно 2–3 модели.
+      // ── Мульти AI — параллельно 2–3 умные модели + vision при скриншотах.
       modelPresets['multi'] = {
-        name: '⭐ Мульти-агент', label: '⭐ Мульти-агент', color: 'pro',
-        desc: 'Роутер параллельно опрашивает 2–3 модели и синтезирует лучший ответ',
+        name: '⭐ Мульти AI', label: '⭐ Мульти AI', color: 'pro',
+        desc: 'Параллельно 2–3 модели + vision для скриншотов; синтез лучшего ответа',
         openai: true,
         apiModel: 'openai/gpt-4.1-nano',
         router: 'multi',
@@ -726,18 +728,25 @@
   function renderModelDropdown() {
     modelDropdown.innerHTML = '';
     const entries = Object.entries(modelPresets).sort((a, b) => {
-      const af = a[1].featured ? 0 : 1;
-      const bf = b[1].featured ? 0 : 1;
-      return af - bf;
+      const rank = k => k.startsWith('direct:') ? 2 : (modelPresets[k]?.featured ? 0 : 1);
+      return rank(a[0]) - rank(b[0]);
     });
     let featuredHeaderShown = false;
+    let directHeaderShown = false;
     entries.forEach(([key, p]) => {
       if (p.featured && !featuredHeaderShown) {
         const sep = document.createElement('div');
         sep.className = 'dropdown-section-label';
-        sep.textContent = '⭐ Топ-модели';
+        sep.textContent = '⭐ Топ-режимы';
         modelDropdown.appendChild(sep);
         featuredHeaderShown = true;
+      }
+      if (key.startsWith('direct:') && !directHeaderShown) {
+        const sep = document.createElement('div');
+        sep.className = 'dropdown-section-label';
+        sep.textContent = '🤖 Выбрать модель вручную';
+        modelDropdown.appendChild(sep);
+        directHeaderShown = true;
       }
       const div = document.createElement('div');
       div.className = 'dropdown-item' + (key === currentModel ? ' active' : '');
@@ -1389,28 +1398,31 @@
   //   reasoning-> пошаговое планирование.
   // Ordered by cost (ascending) — router prefers cheapest model that can handle the task.
   // Falls back up the list on budget/availability errors (isBudgetOrModelError).
-  // Бюджет на один запрос (руб). Жёсткий лимит: один запрос не дороже 0.05₽.
-  const BUDGET_RUB = 0.05;
-  // Цены prompt/completion в ₽ за 1000 токенов — актуальны для VseGPT.ru на момент правки.
-  // Только дешёвые и доступные на базовом плане модели (prompt ≤ 0.02₽, completion ≤ 0.08₽).
-  // Vision-модели в baseline — одна резервная; если на плане не доступна, авто-сканер уберёт её.
+  // Бюджет на один запрос (руб). Жёсткий лимит: один запрос не дороже 0.07₽.
+  const BUDGET_RUB = 0.07;
+  // Цены prompt/completion в ₽ за 1000 токенов — актуальны для VseGPT.ru.
+  // Отобраны вручную: дешёвые кодеры + две vision-модели для работы со скриншотами.
   const BASELINE_ORCHESTRATOR_MODELS = [
-    // Маршрутизатор / лёгкий кодер
-    { id: 'openai/gpt-4.1-nano',             tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
-    // Сильные дешёвые кодеры (под multi)
-    { id: 'openai/gpt-oss-20b',              tier: 'mid',   coding: true,  vision: false, prompt: 0.014, completion: 0.06  },
-    { id: 'openai/gpt-oss-120b',             tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.065 },
-    { id: 'google/gemini-2.5-flash-lite',    tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
-    { id: 'qwen/qwen3-32b',                 tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.055 },
-    { id: 'qwen/qwen3-14b',                 tier: 'mid',   coding: true,  vision: false, prompt: 0.012, completion: 0.033 },
-    { id: 'qwen/qwen3-30b',                 tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.055 },
-    // Сверхдёшевые альтернативы
-    { id: 'amazon/nova-micro-v1',            tier: 'mid',   coding: true,  vision: false, prompt: 0.012, completion: 0.03  },
-    { id: 'cohere/command-r7b-12-2024',      tier: 'mid',   coding: true,  vision: false, prompt: 0.01,  completion: 0.025 },
-    { id: 'mistralai/mistral-small-3.2-24b-instruct', tier: 'mid', coding: true, vision: false, prompt: 0.015, completion: 0.045 },
-    { id: 'meta-llama/llama-3.2-3b-instruct', tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.015 },
-    // Vision-модель для скриншотов (если доступна на плане). Если нет — авто-сканер уберёт.
-    { id: 'vis-qwen/qwen-vl-plus',           tier: 'mid',   coding: true,  vision: true,  prompt: 0.07,  completion: 0.20  },
+    // ── Маршрутизатор (router) — лёгкий, structured JSON, 1M ctx
+    { id: 'openai/gpt-4.1-nano',                          tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
+    // ── Топ-кодеры (coding/UI/лендинги) — проверены на VseGPT
+    { id: 'mistralai/devstral-small',                     tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.045 },
+    { id: 'google/gemini-2.5-flash-lite',                 tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
+    { id: 'google/gemini-2.5-flash-pre',                  tier: 'mid',  coding: true,  vision: false, prompt: 0.018, completion: 0.07  },
+    { id: 'qwen/qwen3-32b',                               tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.055 },
+    { id: 'qwen/qwen3-14b',                               tier: 'mid',  coding: true,  vision: false, prompt: 0.012, completion: 0.033 },
+    { id: 'mistralai/mistral-small-3.2-24b-instruct',     tier: 'mid',  coding: true,  vision: false, prompt: 0.015, completion: 0.045 },
+    { id: 'deepseek/deepseek-chat',                       tier: 'mid',  coding: true,  vision: false, prompt: 0.03,  completion: 0.06  },
+    { id: 'meta-llama/llama-4-scout',                     tier: 'mid',  coding: true,  vision: false, prompt: 0.022, completion: 0.08  },
+    // ── Сверхдёшевые альтернативы
+    { id: 'amazon/nova-micro-v1',                         tier: 'mid',  coding: true,  vision: false, prompt: 0.012, completion: 0.03  },
+    { id: 'cohere/command-r7b-12-2024',                   tier: 'mid',  coding: false, vision: false, prompt: 0.01,  completion: 0.025 },
+    // ── Vision — для скриншотов и картинок
+    { id: 'vis-openai/gpt-5-nano',                        tier: 'mid',  coding: true,  vision: true,  prompt: 0.015, completion: 0.12  },
+    { id: 'vis-meta-llama/llama-3.2-11b-vision-instruct', tier: 'mid',  coding: false, vision: true,  prompt: 0.055, completion: 0.055 },
+    // ── Бесплатные (0₽)
+    { id: 'perplexity/latest-large-online',               tier: 'free', coding: false, vision: false, prompt: 0,     completion: 0     },
+    { id: 'perplexity/latest-small-online',               tier: 'free', coding: false, vision: false, prompt: 0,     completion: 0     },
   ];
   // Активный ростер. Инициализируется baseline, потом обновляется через /api/models.
   let ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
@@ -1466,6 +1478,31 @@
     console.log('[orchestrator] ростер обновлён:', ORCHESTRATOR_MODELS.length, 'моделей. Новых:', newOnes.length);
   }
 
+  // Перестраивает записи modelPresets['direct:*'] из текущего ростера ORCHESTRATOR_MODELS,
+  // чтобы пользователь мог выбрать конкретную модель вручную из дропдауна.
+  function rebuildDirectModelPresets() {
+    if (!modelPresets) return;
+    // Удаляем устаревшие direct-пресеты
+    for (const k of Object.keys(modelPresets)) {
+      if (k.startsWith('direct:')) delete modelPresets[k];
+    }
+    // Добавляем все модели из ростера
+    for (const m of ORCHESTRATOR_MODELS) {
+      const key = 'direct:' + m.id;
+      const cost = ((m.prompt || 0) + (m.completion || 0)).toFixed(3);
+      const shortName = m.id.includes('/') ? m.id.split('/')[1] : m.id;
+      const provider = m.id.includes('/') ? m.id.split('/')[0] : '';
+      modelPresets[key] = {
+        name: shortName, label: shortName,
+        color: m.vision ? 'pro' : (m.prompt === 0 ? 'economy' : 'standard'),
+        desc: (m.vision ? '👁 ' : '') + (m.coding ? '💻 ' : '') + provider + (m.prompt === 0 ? ' · бесплатно' : ' · ~' + cost + '₽/1K'),
+        openai: true,
+        apiModel: m.id,
+        directVision: m.vision
+      };
+    }
+  }
+
   function estimateCost(modelId, promptTokens, completionTokens) {
     const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
     if (!m) return Infinity;
@@ -1519,9 +1556,10 @@
 
   function orchestratorPrompt(mode) {
     const list = ORCHESTRATOR_MODELS.map(m => {
-      const tag = m.coding ? '(coding)' : m.tier === 'reasoning' ? '(reasoning)' : m.tier === 'mid' ? '(mid)' : '(light)';
+      const tag = m.coding ? '(coding)' : m.tier === 'free' ? '(free)' : m.tier === 'mid' ? '(mid)' : '(light)';
       const extra = m.vision ? '·vision' : '';
-      return '- ' + m.id + ' ' + tag + (extra ? ' ' + extra : '');
+      const price = m.prompt === 0 ? '·free' : '';
+      return '- ' + m.id + ' ' + tag + (extra ? ' ' + extra : '') + (price ? ' ' + price : '');
     }).join('\n');
     return [
       'ЖЁСТКОЕ ПРАВИЛО: ответ должен состоять ИСКЛЮЧИТЕЛЬНО из одного валидного JSON. Никаких пояснений, размышлений, prose, Markdown-обёрток до или после JSON. Только JSON.',
@@ -1531,19 +1569,18 @@
       'Правила:',
       '- "direct" ТОЛЬКО для чистого Q&A без кода: приветствие, перевод одной фразы, математика в одно действие, общий факт. Поле answer содержит КРАТКИЙ ответ.',
       '- Любая задача про СОЗДАТЬ / ИЗМЕНИТЬ / УДАЛИТЬ / ОТЛАДИТЬ / ОБЪЯСНИТЬ код/UI/файл/страницу — ОБЯЗАТЕЛЬНО delegate или multi.',
-      '- Если в задаче картинка (vision) — выбирай доступную модель с меткой vision·image. Если таких нет в ростере — используй лучшую coding-модель по описанию.',
-      '- Для современных веб-приложений/лендингов/mini-app — предпочитай gpt-oss-120b, qwen3-coder-next или gemini-2.5-flash-lite.',
-      '- Для алгоритмов, math — qwen3-coder-next.',
-      '- Для быстрых/мелких задач — gpt-4.1-nano или gemini-2.5-flash-lite.',
+      '- Если в задаче картинка (vision) — обязательно включи модель с меткой ·vision. Лучшие vision-варианты: vis-openai/gpt-5-nano, vis-meta-llama/llama-3.2-11b-vision-instruct.',
+      '- Для веб-приложений/лендингов/mini-app — предпочитай mistralai/devstral-small, google/gemini-2.5-flash-pre, deepseek/deepseek-chat.',
+      '- Для быстрых/мелких задач — openai/gpt-4.1-nano, google/gemini-2.5-flash-lite или qwen/qwen3-14b.',
+      '- Для мощного кода — qwen/qwen3-32b, mistralai/devstral-small, meta-llama/llama-4-scout.',
       '- При нулевом балансе — perplexity/latest-large-online (0₽, GPT-4 class, веб-поиск) или perplexity/latest-small-online (0₽, быстрый).',
       '- Если задача содержит «[🎯 ЦЕЛЬ ОПЕРАЦИИ]» или «⌖ <tag>» — это указатель на конкретный файл. Игнорировать нельзя.',
-      '- ',
       '',
-      'ВАЖНО: платформа заточена под разработку современных веб-приложений (React, Next.js, лендинги, дашборды). По умолчанию delegate или multi. Direct — только для чистого Q&A без кода.',
+      'ВАЖНО: платформа заточена под разработку современных веб-приложений, лендингов, mini-app. По умолчанию delegate или multi. Direct — только для чистого Q&A без кода.',
       '',
       mode === 'auto'
-        ? 'Верни ОДИН JSON-объект: {"action":"direct"|"delegate"|"multi", "answer":"...", "model":"<id>", "models":["<id>","<id>"]}. Правила: direct — только для короткого Q&A без кода (поле answer). delegate — одна сильная модель для простой задачи. multi — 2–3 модели параллельно для сложных/UI/лендингов/миниапсов. Если есть картинка — включи vision-модель. Всё должно уложиться в 0.05₽ на 1500 prompt + 1500 completion.'
-        : 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 2–3 id (один с coding, один с vision если есть картинка). ',
+        ? 'Верни ОДИН JSON-объект: {"action":"direct"|"delegate"|"multi", "answer":"...", "model":"<id>", "models":["<id>","<id>"]}. Правила: direct — только для короткого Q&A без кода (поле answer). delegate — одна сильная модель для простой задачи. multi — 2–3 модели параллельно для сложных/UI/лендингов/миниапсов. Если есть картинка — включи vision-модель. Всё должно уложиться в 0.07₽ на 1500 prompt + 1500 completion.'
+        : 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 2–3 id (один с coding, один с vision если есть картинка). Бюджет: 0.07₽ суммарно.',
       '',
       'Без prose. Без тройных бэктиков. Без пояснений. Без "Мы видим, что...". Один JSON от первого до последнего символа.',
       '',
@@ -1645,7 +1682,7 @@
         { role: 'user', content: await userContentFor(content, attachments, supportsVision) }
       ];
     };
-    // В режиме Мульти-агент не нужен router — сразу запускаем параллельный опрос.
+    // В режиме Мульти AI не нужен router — сразу запускаем параллельный опрос.
     // Это экономит кредиты и исключает утечку JSON-ответа router в чат.
     if (mode === 'multi') {
       return await runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel);
@@ -2075,7 +2112,9 @@
                   // Только текущее сообщение отправляем с картинками;
                   // исторические картинки заменяем на текстовое описание,
                   // иначе контекст раздувается до 5+ ₽ за запрос.
-                  const atts = (last && attachments.length) ? attachments : [];
+                  // directVision:false → модель без vision, не отправляем image_url.
+                  const wantsImages = selectedPreset.directVision !== false;
+                  const atts = (last && attachments.length && wantsImages) ? attachments : [];
                   const content = atts.length
                     ? await attachImagesToUser(m.content, atts)
                     : ((m.role === 'user' && m.attachments && m.attachments.length)
@@ -2284,26 +2323,38 @@
     const logo = document.getElementById('modelLogo');
     if (!lab || !status) return;
     const PRETTY = {
-      'perplexity/latest-large-online': 'Perplexity Large',
-      'perplexity/latest-small-online': 'Perplexity Small',
-      'openai/gpt-4.1-nano':            'GPT-4.1 Nano',
-      'vis-openai/gpt-5-nano':          'GPT-5 Nano 👁',
-      'openai/gpt-oss-120b':            'GPT-OSS 120B',
-      'google/gemini-2.5-flash-lite':   'Gemini 2.5 Lite',
-      'qwen/qwen3-coder-next':          'Qwen3 Coder Next',
-      'meta-llama/llama-4-maverick':    'Llama 4 Maverick',
-      'deepseek/deepseek-v4-flash':     'DeepSeek V4 Flash',
+      'perplexity/latest-large-online':            'Perplexity Large',
+      'perplexity/latest-small-online':            'Perplexity Small',
+      'openai/gpt-4.1-nano':                       'GPT-4.1 Nano',
+      'vis-openai/gpt-5-nano':                     'GPT-5 Nano 👁',
+      'mistralai/devstral-small':                  'Devstral Small',
+      'google/gemini-2.5-flash-lite':              'Gemini 2.5 Lite',
+      'google/gemini-2.5-flash-pre':               'Gemini 2.5 Flash',
+      'qwen/qwen3-32b':                            'Qwen3 32B',
+      'qwen/qwen3-14b':                            'Qwen3 14B',
+      'mistralai/mistral-small-3.2-24b-instruct':  'Mistral Small 24B',
+      'deepseek/deepseek-chat':                    'DeepSeek Chat',
+      'meta-llama/llama-4-scout':                  'Llama 4 Scout',
+      'amazon/nova-micro-v1':                      'Nova Micro',
+      'cohere/command-r7b-12-2024':                'Command R 7B',
+      'vis-meta-llama/llama-3.2-11b-vision-instruct': 'Llama Vision 11B 👁',
     };
     const STRENGTHS = {
-      'perplexity/latest-large-online': '🆓 0₽ — GPT-4 class, веб-поиск, 127K',
-      'perplexity/latest-small-online': '🆓 0₽ — быстрый, веб-поиск, 32K',
-      'openai/gpt-4.1-nano':            '0.015₽/1K — роутер, 1M контекст, structured JSON',
-      'vis-openai/gpt-5-nano':          '0.015₽/1K — GPT-5 Nano, vision, 400K ctx',
-      'openai/gpt-oss-120b':            '0.015₽/1K — 120B открытая, код/UI, 128K',
-      'google/gemini-2.5-flash-lite':   '0.015₽/1K — Google, 1M контекст, быстрый',
-      'qwen/qwen3-coder-next':          '0.022₽/1K — Qwen3 кодер нового поколения, 256K',
-      'meta-llama/llama-4-maverick':    '0.03₽/1K — мощная Llama 4, 1M контекст',
-      'deepseek/deepseek-v4-flash':     '0.036₽/1K — DeepSeek V4, 1M контекст',
+      'perplexity/latest-large-online':            '🆓 0₽ — GPT-4 класс, веб-поиск, 32K',
+      'perplexity/latest-small-online':            '🆓 0₽ — быстрый, веб-поиск, 32K',
+      'openai/gpt-4.1-nano':                       '0.015₽/1K — роутер, structured JSON, 1M ctx',
+      'vis-openai/gpt-5-nano':                     '0.015₽/1K — GPT-5 Nano + vision 👁, 400K ctx',
+      'mistralai/devstral-small':                  '0.015₽/1K — кодер Mistral, tools, 128K',
+      'google/gemini-2.5-flash-lite':              '0.015₽/1K — Google, structured, 1M ctx',
+      'google/gemini-2.5-flash-pre':               '0.018₽/1K — Google Flash, мощный кодер, 1M ctx',
+      'qwen/qwen3-32b':                            '0.015₽/1K — Qwen3 32B, сильный кодер',
+      'qwen/qwen3-14b':                            '0.012₽/1K — Qwen3 14B, быстрый, дешёвый',
+      'mistralai/mistral-small-3.2-24b-instruct':  '0.015₽/1K — Mistral 24B, tools+structured',
+      'deepseek/deepseek-chat':                    '0.03₽/1K — DeepSeek, код и логика, 1M ctx',
+      'meta-llama/llama-4-scout':                  '0.022₽/1K — Llama 4 Scout, tools, 328K ctx',
+      'amazon/nova-micro-v1':                      '0.012₽/1K — Nova Micro, дешевейший, tools',
+      'cohere/command-r7b-12-2024':                '0.01₽/1K — Command R 7B, ультра-дешёвый',
+      'vis-meta-llama/llama-3.2-11b-vision-instruct': '0.055₽/1K — Llama Vision 11B 👁, скриншоты',
     };
 
     const swap = /vision-модель:\s*[^\s··]+\s*→\s*([^\s·]+(?:\.[\w/-]+)?)/i.exec(status);
@@ -2330,7 +2381,7 @@
       label = 'Синтез'; badge = 'Router';
       sub = 'Сильные стороны: ' + (STRENGTHS['openai/gpt-4.1-nano'] || 'роутер, 1M контекст');
     } else if (/Параллельный/i.test(status)) {
-      label = 'Мульти-агент'; badge = 'Multi';
+      label = 'Мульти AI'; badge = 'Multi';
       const ids = (status.match(/(\w+\/\w+(?:-\w+)*(?:-[\d.]+)?(?:-thinking-high)?)/g) || []).filter(x => STRENGTHS[x]).slice(0, 2);
       if (ids.length) {
         sub = 'Сильные стороны: ' + ids.map(x => STRENGTHS[x]).join(' / ');
@@ -2338,8 +2389,8 @@
         sub = 'Несколько моделей работают параллельно';
       }
     } else if (/часть моделей/i.test(status)) {
-      label = 'Мульти-агент'; badge = 'Multi';
-      sub = 'Сильные стороны: ' + (STRENGTHS['openai/gpt-oss-120b'] || 'код, UI, лендинги');
+      label = 'Мульти AI'; badge = 'Multi';
+      sub = 'Сильные стороны: ' + (STRENGTHS['mistralai/devstral-small'] || 'код, UI, лендинги');
     } else {
       return;
     }
