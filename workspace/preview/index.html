@@ -1,28 +1,39 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-	<meta charset="UTF-8" />
-	<link rel="stylesheet" href="styles.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <title>Услуги рядом</title>
 </head>
 <body>
-	<header>
-		<h1>Услуги рядом</h1>
-		<nav>
-			<ul>
-				<li><a href="#">Новинки</a></li>
-				<li><a href="#">Блог</a></li>
-				<li><a href="#">цифра</a></li>
-			</ul>
-		</nav>
-	</header>
-	<main>
-		<div class="section">
-			<h2>Новинки</h2>
-			<ul>
-				<!-- şimdi добавляютсяinflate на ł-quoteAPIView 후 добавляنینिनट.ml-->
-			</ul>
-		</div>
-	</main>
-	<script src="script.js"></script>
+    <header>
+        <h1>Услуги рядом</h1>
+        <nav>
+            <ul>
+                <li><a href="#services">Услуги</a></li>
+                <li><a href="#contact">Контакт</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <section id="services">
+            <h2>Наши услуги</h2>
+            <div class="service-list"></div>
+        </section>
+        <section id="contact">
+            <h2>Свяжитесь с нами</h2>
+            <form id="contactForm">
+                <input type="text" placeholder="Ваше имя" required>
+                <input type="email" placeholder="Ваш email" required>
+                <textarea placeholder="Сообщение" required></textarea>
+                <button type="submit">Отправить</button>
+            </form>
+        </section>
+    </main>
+    <footer>
+        <p>© 2023 Услуги рядом</p>
+    </footer>
+    <script src="script.js"></script>
 </body>
 </html>

@@ -1419,16 +1419,21 @@
   async function slimDelegateMessages(id, supportsVision, baseContent, attachments) {
     // Используем SLIM_SYSTEM_PROMPT (≤400 токенов) вместо полного LLM_SYSTEM_PROMPT,
     // чтобы не превышать per-query лимит 0.060₽ на аккаунте VseGPT.
+    // Если приложена картинка — дропаем workspace listing, чтобы остаться под
+    // per-input soft-limit (~2K токенов). С image-attached задача — image→page,
+    // листинг файлов проекта НЕ нужен.
+    const hasImage = !!(attachments || []).some(a => a && /^image\//i.test(a.type || ''));
     let listingLine = '';
-    try {
-      let snap = window._workspaceSnapshot;
-      if (!snap) snap = await loadWorkspaceSnapshot({ maxAgeMs: 15000 });
-      if (snap && Array.isArray(snap.files) && snap.files.length) {
-        // Ограничиваем листинг: только имена файлов, max 300 символов.
-        const fileList = snap.files.map(f => f.path).join(', ');
-        listingLine = 'Файлы: ' + (fileList.length > 300 ? fileList.slice(0, 300) + '…' : fileList);
-      }
-    } catch (e) { /* нет листинга — не страшно */ }
+    if (!hasImage) {
+      try {
+        let snap = window._workspaceSnapshot;
+        if (!snap) snap = await loadWorkspaceSnapshot({ maxAgeMs: 15000 });
+        if (snap && Array.isArray(snap.files) && snap.files.length) {
+          const fileList = snap.files.map(f => f.path).join(', ');
+          listingLine = 'Файлы: ' + (fileList.length > 300 ? fileList.slice(0, 300) + '…' : fileList);
+        }
+      } catch (e) { /* нет листинга — не страшно */ }
+    }
     const sysContent = SLIM_SYSTEM_PROMPT + (listingLine ? '\n' + listingLine : '');
     return [
       { role: 'system', content: sysContent },
@@ -1999,6 +2004,11 @@
     const REFUSAL_RE = /^\s*(К\s+сожалению[, ]*я\s+(не\s+могу|не\s+в\s+состоянии)|I\s+(can'?t|cannot|won'?t|will\s+not)|Sorry[, ]+I\b|Извините[, ]+я\b|I'?m\s+sorry\b|я\s+(не\s+буду|не\s+стану)\s+|Как\s+(ИИ|LLM)[-\s]?модель)/i;
     // Туториал-проse: модель ушла в «1. Установите..., 2. Запустите..., npm ... install» без кода.
     const TUTORIAL_RE = /(?:^|\n)\s*(?:1\.|Шаг\s*\d+|Step\s*\d+|\d+\))\s*[А-ЯЁA-Z][^\n]*\b(?:Установите|Запустите|Create|Install|выполните\s+команду|откройте\s+терминал|create-next-app|npm\s+(?:install|i\s)|npx\s+create-|yarn\s+(?:add|create))\b/m;
+    // Мета-вопросы: модель вернула текст, который **просит пользователя** что-то
+    // описать/предоставить вместо того, чтобы сгенерить код. Без ```-блоков →
+    // бесполезно для image→page сценария.
+    const META_ASK_RE = /^\s*(?:Пожалуйста[, ]+|Уточните[, ]+|Опишите[, ]+|Расскажите[, ]+|Предоставьте[, ]+|Пришлите[, ]+|Дайте[, ]+|Подскажите[, ]+|Поделитесь[, ]+)/i
+                     || /\b(?:пожалуйста[, ]+(?:опишите|предоставьте|дайте|расскажите|уточните|пришлите|подскажите|поделитесь|дайте\s+знать|опишите\s+подробнее|опишите\s+что|уточните\s+что)|опишите\s+(?:что|как|какие)|расскажите\s+(?:про|о))[\s\S]{0,40}?\b(?:изображение|картинк|скриншот|макет|дизайн|страниц)\b/i;
     // Код-стаб: только <h1> + один-два элемента без фрейма/таблицы/формы — модель схитрила.
     const STUB_RE = /<html[\s\S]{0,800}<\/h1>\s*[\s\S]{0,400}<\/body>/i;
     const isUsefulResponse = (t) => {
@@ -2011,6 +2021,11 @@
       if (REFUSAL_RE.test(s)) return false;
       const hasFence = /```/.test(s);
       if (!hasFence && TUTORIAL_RE.test(s)) return false;
+      // Мета-вопрос без кода: «опишите изображение...» — модель попросила
+      // пользователя самого описать картинку. Это никогда не полезно для
+      // image→page сценария — forced-rerun попробует другую модель или
+      // сценарий.
+      if (!hasFence && META_ASK_RE.test(s)) return false;
       // Код-стаб с одним <h1> и пустым телом — отбрасываем, чтобы forced-rerun
       // не повторял ту же скупость.
       if (/<html|<!doctype|<svg/i.test(s) && STUB_RE.test(s.replace(/\n/g,' ').trim())) return false;
