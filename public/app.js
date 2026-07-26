@@ -1474,6 +1474,18 @@
     { id: 'openai/gpt-oss-20b',                           tier: 'light', coding: true, vision: false, prompt: 0.014, completion: 0.06,  name: 'GPT-OSS 20B (Free)',         desc: 'Открытая модель OpenAI, tools, дешёвая' },
     { id: 'google/gemma-4-31b-it',                       tier: 'mid',   coding: true, vision: true,  prompt: 0.045, completion: 0.13,  name: 'Gemma 4 31B (Free)',         desc: 'Google Gemma 4, vision+tools+structured' },
     { id: 'cohere/command-r7b-12-2024',                   tier: 'light', coding: true, vision: false, prompt: 0.01,  completion: 0.025, name: 'North Mini Code (Free)',     desc: 'Cohere Command R7B, заточена под код' },
+    // Дешёвые ≤0.07₽/1K (prompt+completion) — подобраны под запрос пользователя
+    { id: 'qwen/qwen3-32b',                               tier: 'mid',   coding: true, vision: false, prompt: 0.015, completion: 0.055, name: 'Qwen 3 32B (≤0.07₽)',        desc: 'Аналог Qwen 3.5 Plus — флагман, 32B, 0.07₽/1K' },
+    { id: 'qwen/qwen3-14b',                               tier: 'mid',   coding: true, vision: false, prompt: 0.012, completion: 0.033, name: 'Qwen 3 14B (0.045₽)',        desc: 'Qwen 3 средняя, 14B — код/анализ' },
+    { id: 'mistralai/mistral-small-3.2-24b-instruct',     tier: 'mid',   coding: true, vision: false, prompt: 0.015, completion: 0.045, name: 'Mistral Small 3.2 (0.06₽)',  desc: 'Аналог Mistral Medium 3.5 — tools, 24B' },
+    { id: 'google/gemini-flash-1.5',                      tier: 'mid',   coding: true, vision: false, prompt: 0.017, completion: 0.05,  name: 'Gemini Flash 1.5 (0.067₽)',  desc: 'Аналог Gemini 3.5 Flash — старшее поколение, но ≤0.07₽' },
+    { id: 'google/gemini-flash-1.5-8b',                   tier: 'light', coding: true, vision: false, prompt: 0.015, completion: 0.04,  name: 'Gemini Flash 1.5 8B (0.055₽)',desc: 'Gemini Flash 1.5 малая, tools' },
+    { id: 'meta-llama/llama-3-8b-instruct',               tier: 'light', coding: true, vision: false, prompt: 0.035, completion: 0.035, name: 'Llama 3 8B (0.07₽)',          desc: 'Аналог Llama 3.3/3.1 — Llama 3, 8B, ровно 0.07₽/1K' },
+    { id: 'meta-llama/llama-3.2-3b-instruct',             tier: 'light', coding: true, vision: false, prompt: 0.015, completion: 0.015, name: 'Llama 3.2 3B (0.03₽)',        desc: 'Аналог Llama 3.1 8B — Llama 3.2 малая, 3B, дешёвая' },
+    { id: 'perplexity/latest-small-online',               tier: 'light', coding: true, vision: false, prompt: 0,     completion: 0,     name: 'Perplexity Small (Free)',     desc: 'Бесплатно! Веб-поиск, 0₽/1K' },
+    { id: 'perplexity/latest-large-online',               tier: 'mid',   coding: true, vision: false, prompt: 0,     completion: 0,     name: 'Perplexity Large (Free)',     desc: 'Бесплатно! Веб-поиск, 0₽/1K' },
+    { id: 'amazon/nova-lite-v1',                          tier: 'light', coding: true, vision: false, prompt: 0.02,  completion: 0.04,  name: 'Nova Lite (0.06₽)',           desc: 'Amazon Nova Lite, tools, дешёвая' },
+    { id: 'amazon/nova-micro-v1',                         tier: 'light', coding: true, vision: false, prompt: 0.012, completion: 0.03,  name: 'Nova Micro (0.042₽)',         desc: 'Amazon Nova Micro, tools, ещё дешевле' },
   ];
   // Активный ростер. Инициализируется baseline, потом обновляется через /api/models.
   let ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();

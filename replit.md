@@ -84,6 +84,17 @@ Sync идёт через **серверный proxy** (`/api/sync/*` в `server.
 | **GPT-OSS 20B (Free)** | `openai/gpt-oss-20b` | 0.014₽ / 0.06₽ | открытая модель OpenAI, tools |
 | **Gemma 4 31B (Free)** | `google/gemma-4-31b-it` | 0.045₽ / 0.13₽ | Google, vision+tools+structured |
 | **North Mini Code (Free)** | `cohere/command-r7b-12-2024` | 0.01₽ / 0.025₽ | от Cohere, заточена под код |
+| **Qwen 3 32B (≤0.07₽)** | `qwen/qwen3-32b` | 0.015₽ / 0.055₽ | аналог Qwen 3.5 Plus — флагман, 32B |
+| **Qwen 3 14B (0.045₽)** | `qwen/qwen3-14b` | 0.012₽ / 0.033₽ | Qwen 3 средняя — код/анализ |
+| **Mistral Small 3.2 (0.06₽)** | `mistralai/mistral-small-3.2-24b-instruct` | 0.015₽ / 0.045₽ | аналог Mistral Medium 3.5 — tools |
+| **Gemini Flash 1.5 (0.067₽)** | `google/gemini-flash-1.5` | 0.017₽ / 0.05₽ | аналог Gemini 3.5 Flash — старшее поколение |
+| **Gemini Flash 1.5 8B (0.055₽)** | `google/gemini-flash-1.5-8b` | 0.015₽ / 0.04₽ | Gemini Flash 1.5 малая, tools |
+| **Llama 3 8B (0.07₽)** | `meta-llama/llama-3-8b-instruct` | 0.035₽ / 0.035₽ | аналог Llama 3.3/3.1 — ровно 0.07₽/1K |
+| **Llama 3.2 3B (0.03₽)** | `meta-llama/llama-3.2-3b-instruct` | 0.015₽ / 0.015₽ | аналог Llama 3.1 8B — малая, дешёвая |
+| **Perplexity Small (Free)** | `perplexity/latest-small-online` | 0₽ / 0₽ | бесплатно! Веб-поиск |
+| **Perplexity Large (Free)** | `perplexity/latest-large-online` | 0₽ / 0₽ | бесплатно! Веб-поиск |
+| **Nova Lite (0.06₽)** | `amazon/nova-lite-v1` | 0.02₽ / 0.04₽ | Amazon Nova Lite, tools |
+| **Nova Micro (0.042₽)** | `amazon/nova-micro-v1` | 0.012₽ / 0.03₽ | Amazon Nova Micro, tools |
 
 Все модели отсортированы по стоимости (дешёвые выше). Ростер обновляется из каталога VseGPT при старте.
 
