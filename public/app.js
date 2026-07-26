@@ -2002,11 +2002,19 @@
     // (base64-картинка × N делегатов → VseGPT soft-limit «Exceeded 275K→700 tokens
     // expected price 9₽»). Принудительно — ONE-SHOT на самой дешёвой vision+coding.
     if (hasImageAttachment && ids.length > 1) {
+      // ВАЖНО: если в ростере НЕТ vision-модели под бюджет — НЕ берём «любую
+      // первую», иначе не-vision-модель типа llama-3.2-3b получает картинку
+      // и провайдер возвращает «Provider returned error». Лучше явно отдать
+      // ошибку с предложением увеличить бюджет, чем молча провалиться.
       const best = ORCHESTRATOR_MODELS.find(m => m.vision && m.coding && isAvailableModel(m.id))
-                || ORCHESTRATOR_MODELS.find(m => m.vision && isAvailableModel(m.id))
-                || ORCHESTRATOR_MODELS[0];
-      ids = [best.id];
-      onStep && onStep('Картинка приложена — one-shot на ' + best.id + ' (multi утроит бюджет)');
+                || ORCHESTRATOR_MODELS.find(m => m.vision && isAvailableModel(m.id));
+      if (best) {
+        ids = [best.id];
+        onStep && onStep('Картинка приложена — one-shot на ' + best.id + ' (multi утроит бюджет)');
+      } else {
+        onStep && onStep('Картинка есть, но в бюджет не вписалась ни одна vision-модель → возвращаю ошибку');
+        return { text: '', error: 'Нет vision-модели в ростере под бюджет ' + BUDGET_RUB + '₽. Увеличьте бюджет (⚙️ в настройках) или пришлите задачу текстом без картинки.', model: ids.join(',') };
+      }
     }
     onStep && onStep('Параллельный опрос моделей…');
     const sleep = ms => new Promise(r => setTimeout(r, ms));
