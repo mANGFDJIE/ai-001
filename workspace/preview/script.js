@@ -1,3 +1,5 @@
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Документ загружен');
+document.querySelectorAll('.card').forEach(card=>{
+  card.addEventListener('click',()=>{
+    alert(`Вы выбрали: ${card.dataset.service}`);
+  });
 });
