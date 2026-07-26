@@ -140,8 +140,10 @@
       openai: true,
     };
 
-    // Если текущая модель не из ростера — переключаем на режим Мульти AI.
-    if (!modelPresets[currentModel]) {
+    // Устанавливаем режим Мульти AI по умолчанию (Perplexity Large, 0₽).
+    // Если пользователь ранее выбрал другую модель, она сохраняется в sessionStorage.
+    // Первый запуск всегда стартует с Мульти AI.
+    if (!modelPresets[currentModel] || currentModel === DEFAULT_MODEL_KEY) {
       currentModel = 'perplexity-multi-router';
     }
 
