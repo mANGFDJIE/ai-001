@@ -36,7 +36,7 @@
     el.classList.toggle('is-running', !!v);
   }
   // Короткий промпт для slim multi-запросов (≤400 токенов) — не превышает per-query лимит VseGPT 0.060₽
-  const SLIM_SYSTEM_PROMPT = 'You are an autonomous AI coding agent embedded in a web-based IDE. Code blocks MUST start with `// file: path` or `<!-- file: path -->` in the FIRST line of every file block.\n\n=== OUTPUT RULES (STRICT) ===\n1. CODE ONLY — never tutorial prose. NEVER produce numbered steps like `1. Установите Next.js`, `Step 1: create folder`, `npm install`, `npx create-...`, `yarn add`. NO shell commands in prose.\n2. COMPLETE FILES — never stubs, never `// TODO` placeholders, never 5-line skeletons. Each file must be a working modern document.\n3. For any web/Telegram/mobile-app request produce: index.html + styles.css + script.js — fully styled, fully interactive, modern UI.\n4. For TMA / Mini-app / avito-style UI: simulate inside self-contained HTML (previews can\'t run Next.js). Mobile-first, gradient/glassmorphism, hero, card grid, bottom tab nav, profile cards with rounded corners + soft shadows. Use vanilla JS.\n\n=== DESIGN (modern defaults) ===\nDark or premium light theme, Google Fonts, CSS custom properties, modern layout. NO basic Bootstrap, NO placeholder lorem.\n\n=== FILES ===\nUse auto-naming: HTML→index.html, CSS→styles.css, JS→script.js. If user asks for Next.js/TMA, still produce self-contained HTML+CSS+JS (one bundle works as a Telegram Web App preview).\n\n=== TONE ===\n2-4 prose sentences MAX, after code. No leads. No excuses. Reply in Russian if asked in Russian.';
+  const SLIM_SYSTEM_PROMPT = 'You are an autonomous AI coding agent embedded in a web-based IDE. Code blocks MUST start with `// file: path` or `<!-- file: path -->` in the FIRST line of every file block.\n\n=== OUTPUT RULES (STRICT) ===\n1. CODE ONLY — never tutorial prose. NEVER produce numbered steps like `1. Установите Next.js`, `Step 1: create folder`, `npm install`, `npx create-...`, `yarn add`. NO shell commands in prose.\n2. COMPLETE FILES — never stubs, never `// TODO` placeholders, never 5-line skeletons. Each file must be a working modern document.\n3. For any web/Telegram/mobile-app request produce: index.html + styles.css + script.js — fully styled, fully interactive, modern UI.\n4. For TMA / Mini-app / avito-style UI: simulate inside self-contained HTML (previews can\'t run Next.js). Mobile-first, gradient/glassmorphism, hero, card grid, bottom tab nav, profile cards with rounded corners + soft shadows. Use vanilla JS.\n\n=== DESIGN (modern defaults) ===\nDark or premium light theme, Google Fonts, CSS custom properties, modern layout. NO basic Bootstrap, NO placeholder lorem, NO 'lorem ipsum', NO Cyrillic+Latin gibberish, NO fake-генераторы типа 'Glasgow/Cambridge/Koren' — ВСЕГДА реальный русский контент.\n\n=== TMA / avito-style content (REQUIRED) ===\n4. For TMA / avito / services marketplace requests: минимум 4 КОНКРЕТНЫХ карточки с реальными русскими названиями услуг (ремонт, уборка, доставка, грузоперевозки, репетитор, фото-съёмка, маникюр, и т.д.), городская сетка карточек с soft-shadow, rounded-16, фото-плейсхолдеры через бесплатный Unsplash CDN (https://source.unsplash.com/featured/?service). НЕ писать lorem, НЕ смешивать рус/eng слова. Если нужны tag-line, берите реальный русский: «Найдём мастера за 5 минут», а не «lorem ipsum dolore magna».\n\n=== FILES ===\nUse auto-naming: HTML→index.html, CSS→styles.css, JS→script.js. If user asks for Next.js/TMA, still produce self-contained HTML+CSS+JS (one bundle works as a Telegram Web App preview).\n\n=== TONE ===\n2-4 prose sentences MAX, after code. No leads. No excuses. Reply in Russian if asked in Russian.';
   const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS. Every code block MUST start with `// file: path` or `<!-- file: path -->`. No React/Next/TS unless explicitly requested. Keep prose to 2-4 sentences, with no intro or follow-up questions. Reply in Russian. If a target file is specified, edit only that file.';
 
   const LLM_SYSTEM_PROMPT = 'You are an autonomous AI coding agent embedded in a web-based IDE. You build modern web apps, landing pages, dashboards, and full-stack applications.\n\n=== CODE OUTPUT (REQUIRED) ===\nWhen you return ANY code for a file, you MUST include a path marker — one of two ways:\n(1) in the info-string: ```html // file: index.html\n(2) first line inside the block: // file: index.html  OR  <!-- file: index.html -->\nWithout the marker the file will NOT save to workspace. Marker is REQUIRED for any code that lands on disk.\nDefault auto-naming: HTML → index.html, CSS → styles.css, JS → script.js, JSON → data.json.\nIf the file already exists in workspace, EDIT it — do not create a duplicate.\n\n=== PREVIEW ENVIRONMENT (CRITICAL) ===\nThe preview is a STATIC Express server that serves plain HTML/CSS/JS files from workspace/preview/.\nFor ANY user request — TMA, Telegram Mini App, Next.js, React, Vue, avito-style, SaaS landing, dashboard — DELIVER a complete self-contained **index.html + styles.css + script.js** bundle with vanilla JS. Single-page SPA bundle achieves the same UX as Next.js/React for our preview — vanilla JS handles state, History-API routing, animations, modern interactive UI. There is NO build step (no npm / no node_modules / no Next.js server / no CLI scaffolding) — preview serves plain HTML/CSS/JS.\n- Mobile-first responsive: gradient/glassmorphism, hero, card grid, bottom tab nav, profile cards, soft shadows. Lucide via CDN, Google Fonts via <link>. Modern CSS (custom properties, grid, flexbox, @keyframes).\n- DO NOT refuse a request because the user named a framework (Next.js / React / Vue). REFUSAL is FAILURE mode — simulate same UX logic in plain HTML+CSS+JS bundle. User gets an instant working preview; later ports to the named framework.\n- Do not output paths like app/page.tsx, pages/index.tsx, src/App.jsx — these will not render in our Express preview. Always default to index.html / styles.css / script.js, files auto-named by language tag.\n- Single self-contained HTML (inline <style>+<script>) is the GOLD STANDARD for any preview-friendly result. Split into 3 files only when CSS exceeds ~600 lines.\n\n=== MODERN STACK (HTML-first defaults) ===\n• Structure: single index.html with embedded or linked CSS/JS — fully self-contained, no build step\n• CSS: modern CSS (custom properties, grid, flexbox, container queries, @keyframes) — NO Tailwind unless CDN-linked\n• JS: vanilla ES6+ with CDN libraries where needed (e.g. <script src="https://unpkg.com/...">)\n• Design: dark theme by default; Google Fonts via <link>; smooth CSS transitions; glassmorphism/neumorphism if "modern" requested\n• Icons: Lucide via CDN (<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js">) or inline SVG\n• Palette: sophisticated dark (#0a0a0f bg, #7c3aed accent) or premium light — avoid basic neon unless cyberpunk requested\n• Landing pages: hero with gradient text, bento grid, feature cards, social proof section, CTA — Vercel/Linear/Stripe aesthetic\n• Components: fully functional, not placeholder — real interactivity with JS where needed\n• Mobile-first responsive: use CSS clamp(), min(), max() for fluid typography; media queries for layout\n\n=== MOBILE UI LEVEL (REQUIRED) ===\nThe user expects production-quality mobile app interfaces comparable to the attached screenshots: polished profile cards, marketplace service cards, bottom tab navigation, gradient backgrounds, rounded corners, soft shadows, clear hierarchy, and premium feel. When asked for a mobile UI or mini-app, you MUST deliver at least this level:\n• Full mobile viewport simulation (width ~375-430px), centered on desktop, full bleed on mobile.\n• Header card with large gradient or photo + avatar, name, status badge, stats row (likes, views, matches).\n• Rounded large cards (border-radius 16-24px) with soft shadows, clear sections, and ample whitespace.\n• Bottom tab navigation with 3-5 icons and active state indicator.\n• Top-tier typography: bold headings, subtle labels, harmonious Russian text.\n• Material 3 / iOS style: switch toggles, list items with chevrons, icons from Lucide.\n• Color: either vibrant gradient (pink, blue, purple) or premium dark theme; avoid flat, ugly, default browser styles.\n• If a screenshot/reference is attached, replicate its visual structure, proportions, and color mood — not just the layout idea.\n\n=== TONE (STRICT) ===\nWrite like a Replit agent engineer. Max 2-4 prose sentences. No leads (Let us, Well, Currently I, I will review, We should, Here is my plan, Let us begin). No explaining the obvious. No follow-up questions.\nFormat: what changed (filename — one-line gist, comma-separated if multiple). If error: one sentence on what failed.\n\n=== TARGET-FILE RULE ===\nWhen user-content carries a [🎯 ЦЕЛЬ ОПЕРАЦИИ] block with explicit Fayl-cel: ...path.ext, edit STRICTLY that file. Do not ask which file. Just modify it.\n\n=== SELECTED-ELEMENT HINT ===\nIf user mentions ⌖ <tag> in their text, treat it as a soft pointer to the attached selected-element chip. Use pagePath from the chip, not inferred from tag.\n\nReply in Russian if the request is in Russian.\n';
@@ -1455,6 +1455,33 @@
       || /`?\/?[\w.-]+\.(html|css|js|json|jsx|tsx|md)`?/i.test(t);
   }
 
+  // Live-стрим-фильтр для updateStreaming: во время печати выкидывает
+  // CSS-строки (--var: / color: / box-sizing: / margin: / ...) из того,
+  // что ВИДИТ пользователь в чате. После finalizeStreaming финальный full
+  // всё равно проходит через renderMarkdown → stripCodeFromChat, но стрим-
+  // защита делает чат чистым в реальном времени.
+  function scrubForLiveBubble(text) {
+    if (!text) return text;
+    return text.split('\n').filter(line => {
+      if (!line.length) return true;
+      return !/^\s*(?:--[a-zA-Z-]+\s*:|\*\s*\{|html,\s*body|color\s*:|background\s*:|font-(?:family|size|weight)|border(-\w+)?\s*:|margin\s*:|padding\s*:|box-sizing\s*:|display\s*:|position\s*:|flex|grid|gap\s*:|width\s*:|height\s*:|transition\s*:|transform\s*:|@media|@keyframes)/i.test(line);
+    }).join('\n');
+  }
+  // Детектор lorem-ipsum и Cyrillic+Latin gibberish: режет ответы, в которых
+  // модель вернула fake-placeholder (lorem ipsum, Glasgow/Cambridge fake gens,
+  // 'Koren, Marakana, Bristol, ...') или смешала >30% латиницы ≥4-символьных
+  // слов среди кириллицы (типа «С фодал buffer аarthquacy»).
+  const LOREM_RE = /\b(lorem\s+ipsum|ipsum\s+dolor|dolore\s+magna|takimata|simsamsu|syvartis|blorp)\b/i
+  function hasCyrillicGibberish(s) {
+    if (!s || s.length < 60) return false;
+    if (!/[А-ЯЁа-яё]/.test(s)) return false;
+    const cyrLen = (s.match(/[А-ЯЁа-яё]+/g) || []).reduce((a, w) => a + w.length, 0);
+    const latLen = (s.match(/\b[A-Za-z]{4,}\b/g) || []).reduce((a, w) => a + w.length, 0);
+    return cyrLen > 40 && latLen / cyrLen > 0.30;
+  }
+  function isLoremOrGibberish(s) {
+    return LOREM_RE.test(s) || hasCyrillicGibberish(s);
+  }
   function stripCodeFromChat(text, changes) {
     if (!text) return text;
     // 1) ``` fences — стандарт; их гарантированно игнорируем (код уже в workspace).
@@ -2077,6 +2104,10 @@
       // Код-стаб с одним <h1> и пустым телом — отбрасываем, чтобы forced-rerun
       // не повторял ту же скупость.
       if (/<html|<!doctype|<svg/i.test(s) && STUB_RE.test(s.replace(/\n/g,' ').trim())) return false;
+      // Lorem-ipsum / Cyrillic+Latin gibberish: forced-rerun подхватит другую
+      // модель. Типичное поведение gemini-2.5-flash-lite на TMA/avito — кладёт
+      // fake content вместо реальных русских карточек услуг.
+      if (isLoremOrGibberish(s)) return false;
       return true;
     };
     const usefulOk = ok.filter(r => isUsefulResponse(r.text));
@@ -2496,7 +2527,11 @@
       }
       function updateStreaming() {
         if (labelEl) labelEl.textContent = `Генерирую ответ… · ${full.length} симв.`;
-        replaceStreamingContent(thinkEl, full);
+        // CSS-фильтр в реальном времени: пока стрим не закончился, в чате
+        // ВИДНА только prose, строки вида `--primary-color: ...` etc. скрыты.
+        // Финальный full по окончании всё равно идёт через renderMarkdown →
+        // stripCodeFromChat (belt-and-suspenders).
+        replaceStreamingContent(thinkEl, scrubForLiveBubble(full));
         scrollBottom();
       }
 
