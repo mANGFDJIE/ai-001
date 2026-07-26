@@ -1,13 +1,24 @@
-.appContainer {
-  background-color: #e0f7ff;
-  color: white;
+body {
+  background-color: #e0f7fa;
   font-family: Arial, sans-serif;
 }
-.header {
-  background-color: #007bff;
-  padding: 1rem;
+
+main {
+  background-color: #5c77f4;
+  color: white;
+  padding: 20px;
   text-align: center;
 }
-.main {
-  padding: 1rem;
+
+button {
+  background-color: #40a0ff;
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
 }

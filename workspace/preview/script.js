@@ -1,10 +1,12 @@
-(() => {
-  const buttons = [...document.querySelectorAll('.nav-btn')];
-  if (!buttons.length) return;
+document.addEventListener('DOMContentLoaded', () => {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <h1>Услуги рядом</h1>
+    <p>Мини-апс для Telegram, где вы можете найти любые услуги рядом.</p>
+    <button onclick="findServices()">Найти услуги</button>
+  `;
+});
 
-  buttons.forEach((button) => {
-    button.addEventListener('click', () => {
-      buttons.forEach((item) => item.classList.toggle('active', item === button));
-    });
-  });
-})();
+function findServices() {
+  alert('Здесь будут найдены услуги!');
+}

@@ -1944,6 +1944,30 @@
     }));
     const ok = results.filter(r => r.text && !r.error);
     const failed = results.filter(r => r.error);
+    // Жёсткая экономия: режем мусор до того, как он сожжёт синтез.
+    // Многие провайдеры на «сделай Next.js» возвращают либо отказ («к сожа-
+    // лению, я не могу…»), либо прозу с маркерами файлов без кода. И то, и
+    // другое бесполезно как материал для синтеза — отдаём самый длинный
+    // «полезный» ответ напрямую вместо ещё одного платного round-trip.
+    const REFUSAL_RE = /^\s*(К\s+сожалению[, ]*я\s+(не\s+могу|не\s+в\s+состоянии)|I\s+(can'?t|cannot|won'?t|will\s+not)|Sorry[, ]+I\b|Извините[, ]+я\b|I'?m\s+sorry\b|я\s+(не\s+буду|не\s+стану)\s+|Как\s+(ИИ|LLM)[-\s]?модель)/i;
+    const isUsefulResponse = (t) => {
+      const s = String(t || '').trim();
+      if (s.length < 200) return false;
+      // Только маркеры файлов в prose без какого-либо кода — заглушка.
+      const onlyMarkers = /^\s*(?:<!--\s*file:|\/\/\s*file:|#\s*file:)[^\n]*$/m.test(s)
+                       && !/```|<html|<!doctype|<svg|<\w+/i.test(s);
+      if (onlyMarkers) return false;
+      if (REFUSAL_RE.test(s)) return false;
+      return true;
+    };
+    const usefulOk = ok.filter(r => isUsefulResponse(r.text));
+    if (ok.length && !usefulOk.length) {
+      ok.sort((a, b) => b.text.length - a.text.length);
+      onStep && onStep('Делегаты вернули отказ/заглушки → отдаю самый длинный ответ напрямую (синтез пропущен)');
+      return { text: ok[0].text, model: ok[0].id };
+    }
+    // Сжимаем ok до полезных, чтобы дальнейший synth/retry не сжигал токены.
+    ok.length = 0; ok.push(...usefulOk);
     if (failed.length) {
       failed.forEach(f => { if (isBudgetOrModelError(f.error)) markUnavailable(f.id); });
       onStep && onStep('Часть моделей вернула ошибку: ' + failed.map(f => f.id + ' (' + f.error + ')').join(', '));
