@@ -1,153 +1,148 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Обучение ИА</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet"/>
-  <style>
-    :root {
-      --color-bg: #f0f2f5;
-      --color-primary: #222;
-      --color-accent: #4f46e5;
-      --font-family: 'Inter', sans-serif;
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Киберпанк Стиль</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-color: #0a0a0f;
+    --accent-color: #f0f;
+    --neon-color: #0ff;
+    --dark-gray: #222;
+    --primary: #ff00ff;
+    --secondary: #00ffff;
+    --accent: #ff0080;
+    --text-color: #e0e0e0;
+    --muted: #a0a0a0;
+    --glitch1: #ff00ff;
+    --glitch2: #00ffff;
+    --glitch3: #ff0080;
+    --border-radius: 12px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
+  }
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    background: linear-gradient(135deg, var(--bg-color), #1a1a1d);
+    color: var(--text-color);
+    font-family: 'Orbitron', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 100vh;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 4rem);
+    text-align: center;
+    background: linear-gradient(45deg, var(--primary), var(--secondary));
+    background-size: 600% 600%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientAnimation 10s ease infinite;
+    margin: 40px 0;
+  }
+  @keyframes gradientAnimation {
+    0% {background-position: 0% 50%;}
+    50% {background-position: 100% 50%;}
+    100% {background-position: 0% 50%;}
+  }
+  .card {
+    background-color: var(--dark-gray);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    max-width: 300px;
+    width: 100%;
+    box-shadow: var(--shadow-md);
+    margin: 20px 0;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 30px var(--neon-color);
+  }
+  .card h2 {
+    margin-top: 0;
+    font-size: 1.5rem;
+    background: linear-gradient(45deg, var(--neon-color), var(--primary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: transparent;
+    border: 2px solid var(--neon-color);
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-top: 15px;
+    transition: background-color 0.3s, transform 0.2s;
+  }
+  .button:hover {
+    background-color: var(--neon-color);
+    color: #000;
+    transform: scale(1.05);
+  }
+  footer {
+    margin-top: auto;
+    padding: 20px;
+    font-size: 0.9rem;
+    color: #888;
+  }
+  @keyframes flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+      opacity: 1;
     }
-    body {
-      margin: 0;
-      font-family: var(--font-family);
-      background-color: var(--color-bg);
-      color: var(--color-primary);
-      line-height: 1.6;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    20%, 22%, 24%, 55% {
+      opacity: 0.3;
     }
-    header {
-      width: 100%;
-      padding: 2rem;
-      background: linear-gradient(90deg, #667eea, #764ba2);
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-    }
-    header h1 {
-      font-size: 2.5rem;
-      margin: 0;
-    }
-    header p {
-      max-width: 600px;
-      margin-top: 1rem;
-      font-size: 1.2rem;
-    }
-    section {
-      width: 100%;
-      max-width: 1200px;
-      padding: 4rem 1rem;
-      display: grid;
-      gap: 2rem;
-    }
-    .card {
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-      padding: 2rem;
-      transition: transform 0.3s, box-shadow 0.3s;
-    }
-    .card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 12px 24px rgba(0,0,0,0.2);
-    }
-    .card h2 {
-      margin-top: 0;
-      font-size: 1.5rem;
-    }
-    button {
-      background-color: var(--color-accent);
-      color: #fff;
-      border: none;
-      padding: 1rem 2rem;
-      border-radius: 8px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    button:hover {
-      background-color: #3b2fdb;
-    }
-    #features {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-around;
-    }
-    .feature {
-      flex: 1 1 300px;
-      margin: 1rem;
-    }
-    footer {
-      width: 100%;
-      padding: 2rem;
-      background: #222;
-      color: #fff;
-      text-align: center;
-    }
-    /* Анимация появления элементов */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .animate {
-      opacity: 0;
-      animation: fadeIn 1s forwards;
-    }
-  </style>
+  }
+  .neon-text {
+    color: var(--neon-color);
+    font-size: 1.2rem;
+    animation: flicker 1.5s infinite alternate;
+  }
+</style>
 </head>
 <body>
-  <header class="animate" style="animation-delay: 0.2s;">
-    <h1>Обучение Искусственному Интеллекту</h1>
-    <p>Овладейте передовыми технологиями AI с нашим курсом и станьте экспертом будущего</p>
-  </header>
 
-  <section id="features" class="animate" style="animation-delay: 0.4s;">
-    <div class="card">
-      <h2>Практические задачи</h2>
-      <p>Работайте над реальными проектами и погружайтесь в алгоритмы машинного обучения.</p>
-    </div>
-    <div class="card">
-      <h2>Экспертное обучение</h2>
-      <p>Обучайтеся у ведущих специалистов индустрии с современными кейсами.</p>
-    </div>
-    <div class="card">
-      <h2>Гибкий график</h2>
-      <p>Учитесь в удобное для вас время и месте, в гибком формате онлайн.</p>
-    </div>
-  </section>
+<h1>Киберпанк Мир</h1>
 
-  <section style="text-align: center; padding: 4rem 1rem;">
-    <h2 style="margin-bottom: 2rem;">Начните свой путь в AI сейчас</h2>
-    <button onclick="alert('Записаться на курс')">Записаться</button>
-  </section>
+<div class="card">
+  <h2>Профиль</h2>
+  <p class="neon-text">Городская тень и неоновые лучи</p>
+  <button class="button">Войти</button>
+</div>
 
-  <footer>
-    &copy; 2023 Обучение ИИ — Все права защищены
-  </footer>
+<div class="card">
+  <h2>Функции</h2>
+  <ul>
+    <li>Адаптивный дизайн</li>
+    <li>Неоновое освещение</li>
+    <li>Динамическая анимация</li>
+  </ul>
+  <button class="button">Начать</button>
+</div>
 
-  <script>
-    // Простая анимация при пролистывании
-    const elements = document.querySelectorAll('.animate');
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.style.opacity = 1;
-          entry.target.style.transform = 'translateY(0)';
-        }
-      });
-    }, { threshold: 0.1 });
-    elements.forEach(el => {
-      el.style.opacity = 0;
-      observer.observe(el);
-    });
-  </script>
+<footer>
+  <p>&copy; 2023 Киберпанк Стиль</p>
+</footer>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+  lucide.createIcons();
+</script>
 </body>
 </html>

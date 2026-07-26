@@ -494,32 +494,19 @@ body {
 }
 
 .input-box {
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 7px 9px 5px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background:
-    linear-gradient(var(--bg3), var(--bg3)) padding-box,
-    conic-gradient(
-      from var(--border-angle),
-      #3b82f6 0deg,
-      #22d3ee 90deg,
-      #10b981 180deg,
-      #22d3ee 270deg,
-      #3b82f6 360deg
-    ) border-box;
-  animation: flow-border 4s linear infinite;
+  background: var(--bg3);
   z-index: 0;
 }
 
 .input-box:focus-within {
-  animation-duration: 2.5s;
-}
-
-@keyframes flow-border {
-  to { --border-angle: 360deg; }
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 textarea {
@@ -737,9 +724,7 @@ textarea::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
-  background-size: 22px 22px;
-  opacity: .6;
+  background: transparent;
   pointer-events: none;
 }
 
@@ -837,21 +822,9 @@ textarea::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2
   color: var(--green);
 }
 
-/* ─── Local model load progress bar ───────────────────── */
-.load-bar {
-  height: 3px;
-  background: var(--bg3);
-  border-radius: 2px;
-  overflow: hidden;
-  margin: 6px 0 8px 22px;
-  max-width: 360px;
-}
-.load-bar-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--accent), var(--purple));
-  transition: width .3s ease;
-}
+/* ─── Local model load progress bar (hidden — avoids stray gradient line) ── */
+.load-bar,
+.load-bar-fill { display: none; }
 
 /* ─── OPENROUTER FALLBACK BADGE ──────────────────────── */
 .fallback-badge {

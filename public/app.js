@@ -145,10 +145,19 @@
 
     // Add OpenAI-compatible models (DeepSeek, OpenAI, OpenRouter…)
     if (config.hasOpenAI) {
-      // ── Мульти-агент — лёгкий роутер, всегда параллельно опрашивает 2–3 модели.
+      // ── Авто — лёгкий роутер сам выбирает 1–3 модели под задачу и бюджет.
+      modelPresets['auto'] = {
+        name: '⭐ Авто', label: '⭐ Авто', color: 'auto',
+        desc: 'Роутер (GPT-4.1 Nano) оценивает задачу и подключает 1–3 дешёвые модели для лучшего результата',
+        openai: true,
+        apiModel: 'openai/gpt-4.1-nano',
+        router: 'auto',
+        featured: true
+      };
+      // ── Мульти-агент — всегда параллельно 2–3 модели.
       modelPresets['multi'] = {
         name: '⭐ Мульти-агент', label: '⭐ Мульти-агент', color: 'pro',
-        desc: 'Роутер (GPT-4.1 Nano) параллельно опрашивает 2–3 модели и синтезирует лучший ответ (параллельно 2–3 модели)',
+        desc: 'Роутер параллельно опрашивает 2–3 модели и синтезирует лучший ответ',
         openai: true,
         apiModel: 'openai/gpt-4.1-nano',
         router: 'multi',
@@ -1380,29 +1389,28 @@
   //   reasoning-> пошаговое планирование.
   // Ordered by cost (ascending) — router prefers cheapest model that can handle the task.
   // Falls back up the list on budget/availability errors (isBudgetOrModelError).
-  // Бюджет на один запрос (руб).
-  const BUDGET_RUB = 0.2;
+  // Бюджет на один запрос (руб). Жёсткий лимит: один запрос не дороже 0.05₽.
+  const BUDGET_RUB = 0.05;
   // Цены prompt/completion в ₽ за 1000 токенов — актуальны для VseGPT.ru на момент правки.
-  // Сортировка: сначала сильные дешёвые, потом мощнее. Router идёт сверху вниз.
-  // Модели, которые требуют апгрейда плана (например, perplexity online, gpt-5-nano),
-  // исключены из baseline — авто-сканер может добавить их, если они станут доступны.
+  // Только дешёвые и доступные на базовом плане модели (prompt ≤ 0.02₽, completion ≤ 0.08₽).
+  // Vision-модели в baseline — одна резервная; если на плане не доступна, авто-сканер уберёт её.
   const BASELINE_ORCHESTRATOR_MODELS = [
-    // топ-дешёвые сильные кодеры
+    // Маршрутизатор / лёгкий кодер
     { id: 'openai/gpt-4.1-nano',             tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
+    // Сильные дешёвые кодеры (под multi)
     { id: 'openai/gpt-oss-20b',              tier: 'mid',   coding: true,  vision: false, prompt: 0.014, completion: 0.06  },
     { id: 'openai/gpt-oss-120b',             tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.065 },
     { id: 'google/gemini-2.5-flash-lite',    tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
-    { id: 'google/gemini-2.5-flash-pre',     tier: 'mid',   coding: true,  vision: false, prompt: 0.018, completion: 0.07  },
     { id: 'qwen/qwen3-32b',                 tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.055 },
-    { id: 'openai/gpt-oss-120b-fast',        tier: 'mid',   coding: true,  vision: false, prompt: 0.021, completion: 0.085 },
-    { id: 'meta-llama/llama-4-scout',        tier: 'mid',   coding: true,  vision: false, prompt: 0.022, completion: 0.08  },
-    // 0.09–0.12₽/1K — более мощные
-    { id: 'deepseek/deepseek-v4-flash',      tier: 'mid',   coding: true,  vision: false, prompt: 0.036, completion: 0.072 },
-    { id: 'deepseek/deepseek-v4-flash-thinking', tier: 'mid', coding: true, vision: false, prompt: 0.036, completion: 0.072 },
-    { id: 'deepseek/deepseek-v4-flash-alt',   tier: 'mid',   coding: true,  vision: false, prompt: 0.04,  completion: 0.08  },
-    { id: 'qwen/qwen3-coder-next',           tier: 'mid',   coding: true,  vision: false, prompt: 0.022, completion: 0.12  },
-    // Vision-модели исключены из baseline — на базовом тарифе VseGPT они требуют upgrade.
-    // Если пользователь апгрейдит план, авто-сканер подтянет их из /api/models.
+    { id: 'qwen/qwen3-14b',                 tier: 'mid',   coding: true,  vision: false, prompt: 0.012, completion: 0.033 },
+    { id: 'qwen/qwen3-30b',                 tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.055 },
+    // Сверхдёшевые альтернативы
+    { id: 'amazon/nova-micro-v1',            tier: 'mid',   coding: true,  vision: false, prompt: 0.012, completion: 0.03  },
+    { id: 'cohere/command-r7b-12-2024',      tier: 'mid',   coding: true,  vision: false, prompt: 0.01,  completion: 0.025 },
+    { id: 'mistralai/mistral-small-3.2-24b-instruct', tier: 'mid', coding: true, vision: false, prompt: 0.015, completion: 0.045 },
+    { id: 'meta-llama/llama-3.2-3b-instruct', tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.015 },
+    // Vision-модель для скриншотов (если доступна на плане). Если нет — авто-сканер уберёт.
+    { id: 'vis-qwen/qwen-vl-plus',           tier: 'mid',   coding: true,  vision: true,  prompt: 0.07,  completion: 0.20  },
   ];
   // Активный ростер. Инициализируется baseline, потом обновляется через /api/models.
   let ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
@@ -1533,9 +1541,9 @@
       '',
       'ВАЖНО: платформа заточена под разработку современных веб-приложений (React, Next.js, лендинги, дашборды). По умолчанию delegate или multi. Direct — только для чистого Q&A без кода.',
       '',
-      mode === 'multi'
-        ? 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 2–3 id (один с coding, один с vision если есть картинка). '
-        : 'Верни ОДИН JSON-объект: {"action":"delegate","model":"<id>"} — выбери самую дешёвую сильную модель с coding/vision под задачу ().',
+      mode === 'auto'
+        ? 'Верни ОДИН JSON-объект: {"action":"direct"|"delegate"|"multi", "answer":"...", "model":"<id>", "models":["<id>","<id>"]}. Правила: direct — только для короткого Q&A без кода (поле answer). delegate — одна сильная модель для простой задачи. multi — 2–3 модели параллельно для сложных/UI/лендингов/миниапсов. Если есть картинка — включи vision-модель. Всё должно уложиться в 0.05₽ на 1500 prompt + 1500 completion.'
+        : 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 2–3 id (один с coding, один с vision если есть картинка). ',
       '',
       'Без prose. Без тройных бэктиков. Без пояснений. Без "Мы видим, что...". Один JSON от первого до последнего символа.',
       '',
@@ -1767,11 +1775,19 @@
       }
       return { text: r.text, model: id };
     }
+    if (decision.action === 'multi') {
+      let ids = Array.isArray(decision.models) ? decision.models : [];
+      if (hasImageAttachment) ids = ids.map(id => pickVision(id, false));
+      ids = ids.filter(id => ORCHESTRATOR_MODELS.find(m => m.id === id)).slice(0, 3);
+      return await runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel, ids);
+    }
     return { text: '', error: 'Неизвестное действие: ' + decision.action, model: routerModel };
   }
 
-  async function runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel) {
-    let ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
+  async function runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel, suggestedIds = null) {
+    let ids = Array.isArray(suggestedIds) && suggestedIds.length
+      ? suggestedIds.filter(id => ORCHESTRATOR_MODELS.find(m => m.id === id)).slice(0, 3)
+      : pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
     const estimatedCost = ids.reduce((sum, id) => sum + estimateCost(id, 1500, 1500), 0);
     if (estimatedCost > BUDGET_RUB) {
       onStep && onStep('Router выбрал неподходящие модели → пересобираю');
