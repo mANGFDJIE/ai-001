@@ -1587,7 +1587,27 @@
     ].join('\n');
   }
 
+  // VseGPT rate-limit: 1 запрос в секунду на весь аккаунт. Глобальный
+  // rate-limiter гарантирует, что между любыми исходящими запросами не
+  // менее 1.1 секунды — независимо от модели и параллельности.
+  let _lastApiCallTime = 0;
+  let _apiCallQueue = Promise.resolve();
+  async function rateLimitedApiCall(fn) {
+    return _apiCallQueue = _apiCallQueue.then(async () => {
+      const now = Date.now();
+      const elapsed = now - _lastApiCallTime;
+      const minInterval = 1100; // 1.1 с запасом под сетевой jitter
+      if (elapsed < minInterval) {
+        await new Promise(r => setTimeout(r, minInterval - elapsed));
+      }
+      const result = await fn();
+      _lastApiCallTime = Date.now();
+      return result;
+    });
+  }
+
   async function callOpenAI(model, messages, maxTokens = 8192) {
+    return rateLimitedApiCall(async () => {
     const resp = await fetch('/api/chat/openai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1633,6 +1653,7 @@
       }
     }
     return { text: full, error: errorMsg, model };
+    });
   }
 
   async function runOrchestrator(content, mode, onStep, attachments, history) {
