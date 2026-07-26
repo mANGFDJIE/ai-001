@@ -1,22 +1,25 @@
-import './globals.css';
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="ru">
-      <head>
-        <title>Услуги рядом</title>
-      </head>
-      <body>
-        <header className="header">
-          <h1>Услуги рядом</h1>
-        </header>
-        <main>{children}</main>
-        <nav className="bottom-nav">
-          <button>Главная</button>
-          <button>Категории</button>
-          <button>Профиль</button>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Услуги рядом</title>
+    <link rel="stylesheet" href="/app/globals.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div className="logo">Услуги рядом</div>
+        <nav>
+          <a href="/app/ai-course">AI курсы</a>
+          <a href="/app/ai-learning">Учеба</a>
+          <a href="/app/ai-training">Обучение</a>
         </nav>
-      </body>
-    </html>
-  );
-}
+      </header>
+      <main>
+        <div id="content">
+          {/* Content will be dynamically inserted here */}
+        </div>
+      </main>
+      <footer>© 2023 Услуги рядом</footer>
+    </div>
+  </body>
+</html>

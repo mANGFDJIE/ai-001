@@ -22,7 +22,7 @@
   const scanBtn = document.getElementById('scanModels');
   const scanStatus = document.getElementById('scanStatus');
 
-  let currentModel = 'direct:google/gemini-2.5-flash-lite';
+  let currentModel = 'multi';
   let sending = false;
   let modelPresets = {};
   let config = { hasLocalLLM: false, llmModel: '', hasOpenAI: false, openaiBaseURL: '' };
@@ -156,8 +156,18 @@
         featured: true
       };
       // Default — google/gemini-2.5-flash-lite как надёжный и дешёвый кодер.
-      if (currentModel === 'auto' || currentModel === 'orchestrator' || currentModel === 'openai-chat' || currentModel === 'deepseek-reasoner' || currentModel.startsWith('featured-')) {
-        currentModel = 'direct:google/gemini-2.5-flash-lite';
+      // Если сохранённое значение — устаревший single-model дефолт
+      // или старые ключи (auto / orchestrator / openai-chat / featured-*),
+      // мигрируем в режим Мульти AI — пользователь явно попросил multi по умолчанию.
+      if (
+        currentModel === 'auto' ||
+        currentModel === 'orchestrator' ||
+        currentModel === 'openai-chat' ||
+        currentModel === 'deepseek-reasoner' ||
+        currentModel === 'direct:google/gemini-2.5-flash-lite' ||
+        currentModel.startsWith('featured-')
+      ) {
+        currentModel = 'multi';
       }
     }
 
@@ -1266,6 +1276,7 @@
         Работал ${worked} сек
       </div>` : ''}`;
     messagesEl.appendChild(div);
+    scrollBottom();
   }
 
   function renderMarkdown(text) {
@@ -1933,14 +1944,22 @@
     } catch (e) {
       console.warn('[orchestrator] pre-write failed:', e);
     }
-    const blocks = ok.map(r => '### ' + r.id + '\n' + r.text).join('\n\n---\n\n');
+    const rawBlocks = ok.map(r => '### ' + r.id + '\n' + r.text).join('\n\n---\n\n');
+    // VseGPT делает soft pre-flight по (prompt + max_completion). Урезаем блоки
+    // до бюджета (≈6K символов ≈ 1.5K токенов), чтобы синтез не упёрся в
+    // лимит 0.07₽/запрос. Первый ответ модели обычно содержит самое важное;
+    // при урезании оставляем именно его.
+    const MAX_BLOCK_CHARS = 6000;
+    const blocks = rawBlocks.length > MAX_BLOCK_CHARS
+      ? rawBlocks.slice(0, MAX_BLOCK_CHARS) + '\n\n[… урезано для бюджета …]'
+      : rawBlocks;
     onStep && onStep('Синтез финального ответа…');
     let synth;
     const synthMsgs = [
       { role: 'system', content: 'Синтезатор. ОБЯЗАТЕЛЬНО сохраняй все блоки кода с пометкой `// file: path`, `<!-- file: path -->` или подобные — КАК ЕСТЬ, не перефразируй и не теряй. Объедини лучшие части ответов в один точный ответ на русском. Не упоминай, что было несколько моделей.\n\n=== ТОН: REPLIT-AGENT ===\nПиши как инженер в Slack — не эссеист. Не более 2-4 предложений prose. Без вступлений: «Давайте», «Хорошо», «Сейчас я», «Я рассмотрю», «Мы должны», «Вот мой план», «Давайте начнём». Без объяснений очевидного. Без встречных вопросов в конце. Формат — что изменено одной строкой через запятую + одно предложение пояснения при необходимости.' },
       { role: 'user', content: 'Запрос:\n<<<\n' + content + '>>>\n\nОтветы:\n' + blocks }
     ];
-    try { synth = await callOpenAI(routerModel, synthMsgs); }
+    try { synth = await callOpenAI(routerModel, synthMsgs, capMaxTokens(routerModel)); }
     catch (err) {
       onStep && onStep('Синтез упал: ' + err.message);
       return { text: ok[0].text, model: ok[0].id };
@@ -2555,13 +2574,16 @@
   function scrollBottom() {
     const el = messagesEl;
     if (!el) return;
-    const isNearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 120;
-    // Если пользователь не откроллил вверх — подтягиваем вниз (с задержкой, чтобы DOM успел обновиться).
-    if (isNearBottom) {
-      [0, 50, 150, 300].forEach(ms => setTimeout(() => {
-        el.scrollTo({ top: el.scrollHeight, behavior: ms === 0 ? 'smooth' : 'auto' });
-      }, ms));
-    }
+    // Реплит-агент стиль: всегда подтягиваем чат вниз на программных апдейтах.
+    // Несколько setTimeout покрывают:
+    //   • позднюю отрисовку картинок / markdown;
+    //   • streaming-чанки, дорастающие scrollHeight после первого скролла;
+    //   • загрузку истории (часто layout пересчитывается после монтирования).
+    const scrollNow = () => {
+      try { el.scrollTo({ top: el.scrollHeight, behavior: 'auto' }); } catch {}
+    };
+    scrollNow();
+    [0, 50, 150, 300, 600].forEach(ms => setTimeout(scrollNow, ms));
   }
   function removeEmptyState() { messagesEl.querySelector('.empty-chat')?.remove(); }
   function autoResize() { inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
