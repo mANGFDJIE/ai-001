@@ -1,21 +1,16 @@
-<!-- откат изменений в app/layout.tsx, обратно к исходным настройкам -->
-<html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Приложение</title>
-    <link rel="stylesheet" href="/app/globals.css" />
-  </head>
-  <body>
-    <header>
-      <nav>
-        <ul>
-          <li><a href="/">Главная</a></li>
-          <li><a href="/ai">ИИ</a></li>
-        </ul>
-      </nav>
-    </header>
-    <main>
-      <Outlet />
-    </main>
-  </body>
-</html>
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="UTF-8"/>
+<title>AI-002 — ожидание задачи</title>
+<style>
+  body{margin:0;font:16px/1.5 -apple-system,system-ui,sans-serif;background:#0a0a0f;color:#e5e7eb;display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .wrap{max-width:560px;text-align:center;padding:32px}
+  h1{font-size:32px;margin:0 0 12px;background:linear-gradient(90deg,#7c3aed,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  p{color:#9ca3af}
+  .pill{display:inline-block;padding:6px 12px;border-radius:999px;background:#1f2937;color:#a78bfa;font-size:13px;margin-top:8px}
+</style></head>
+<body><div class="wrap">
+<h1>Готов к работе</h1>
+<p>Превью подключено. Напишите задачу слева — агент запишет файлы и обновит эту страницу.</p>
+<span class="pill">static preview · workspace/preview</span>
+</div></body></html>
