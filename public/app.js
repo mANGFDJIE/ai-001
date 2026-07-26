@@ -1522,22 +1522,12 @@
     { id: 'vis-openai/gpt-4o-mini',                       tier: 'vision', coding: true, vision: true, prompt: 0.037, completion: 0.15,  name: 'Copilot — GPT-4o mini',      desc: 'OpenAI vision + кодинг — аналог GitHub Copilot' },
     { id: 'vis-meta-llama/llama-4-scout',                 tier: 'vision', coding: true, vision: true, prompt: 0.05,  completion: 0.16,  name: 'Replit Agent — Llama 4 Scout', desc: 'Быстрый open-source vision-кодер с tools' },
     { id: 'vis-anthropic/claude-3-haiku',                 tier: 'vision', coding: true, vision: true, prompt: 0.066, completion: 0.30,  name: 'Claude 3 Haiku Vision',      desc: 'Антропик vision — аналог Claude' },
-    // Бесплатные модели VseGPT (Free-тариф)
-    { id: 'openai/gpt-oss-20b',                           tier: 'light', coding: true, vision: false, prompt: 0.014, completion: 0.06,  name: 'GPT-OSS 20B (Free)',         desc: 'Открытая модель OpenAI, tools, дешёвая' },
-    { id: 'google/gemma-4-31b-it',                       tier: 'mid',   coding: true, vision: true,  prompt: 0.045, completion: 0.13,  name: 'Gemma 4 31B (Free)',         desc: 'Google Gemma 4, vision+tools+structured' },
-    { id: 'cohere/command-r7b-12-2024',                   tier: 'light', coding: true, vision: false, prompt: 0.01,  completion: 0.025, name: 'North Mini Code (Free)',     desc: 'Cohere Command R7B, заточена под код' },
-    // Дешёвые ≤0.07₽/1K (prompt+completion) — подобраны под запрос пользователя
-    { id: 'qwen/qwen3-32b',                               tier: 'mid',   coding: true, vision: false, prompt: 0.015, completion: 0.055, name: 'Qwen 3 32B (≤0.07₽)',        desc: 'Аналог Qwen 3.5 Plus — флагман, 32B, 0.07₽/1K' },
-    { id: 'qwen/qwen3-14b',                               tier: 'mid',   coding: true, vision: false, prompt: 0.012, completion: 0.033, name: 'Qwen 3 14B (0.045₽)',        desc: 'Qwen 3 средняя, 14B — код/анализ' },
-    { id: 'mistralai/mistral-small-3.2-24b-instruct',     tier: 'mid',   coding: true, vision: false, prompt: 0.015, completion: 0.045, name: 'Mistral Small 3.2 (0.06₽)',  desc: 'Аналог Mistral Medium 3.5 — tools, 24B' },
-    { id: 'google/gemini-flash-1.5',                      tier: 'mid',   coding: true, vision: false, prompt: 0.017, completion: 0.05,  name: 'Gemini Flash 1.5 (0.067₽)',  desc: 'Аналог Gemini 3.5 Flash — старшее поколение, но ≤0.07₽' },
-    { id: 'google/gemini-flash-1.5-8b',                   tier: 'light', coding: true, vision: false, prompt: 0.015, completion: 0.04,  name: 'Gemini Flash 1.5 8B (0.055₽)',desc: 'Gemini Flash 1.5 малая, tools' },
-    { id: 'meta-llama/llama-3-8b-instruct',               tier: 'light', coding: true, vision: false, prompt: 0.035, completion: 0.035, name: 'Llama 3 8B (0.07₽)',          desc: 'Аналог Llama 3.3/3.1 — Llama 3, 8B, ровно 0.07₽/1K' },
-    { id: 'meta-llama/llama-3.2-3b-instruct',             tier: 'light', coding: true, vision: false, prompt: 0.015, completion: 0.015, name: 'Llama 3.2 3B (0.03₽)',        desc: 'Аналог Llama 3.1 8B — Llama 3.2 малая, 3B, дешёвая' },
-    { id: 'perplexity/latest-small-online',               tier: 'light', coding: true, vision: false, prompt: 0,     completion: 0,     name: 'Perplexity Small (Free)',     desc: 'Бесплатно! Веб-поиск, 0₽/1K' },
-    { id: 'perplexity/latest-large-online',               tier: 'mid',   coding: true, vision: false, prompt: 0,     completion: 0,     name: 'Perplexity Large (Free)',     desc: 'Бесплатно! Веб-поиск, 0₽/1K' },
-    { id: 'amazon/nova-lite-v1',                          tier: 'light', coding: true, vision: false, prompt: 0.02,  completion: 0.04,  name: 'Nova Lite (0.06₽)',           desc: 'Amazon Nova Lite, tools, дешёвая' },
-    { id: 'amazon/nova-micro-v1',                         tier: 'light', coding: true, vision: false, prompt: 0.012, completion: 0.03,  name: 'Nova Micro (0.042₽)',         desc: 'Amazon Nova Micro, tools, ещё дешевле' },
+    // VseGPT — 5 моделей по запросу пользователя
+    { id: 'deepseek/deepseek-chat',                      tier: 'mid',   coding: true, vision: false, prompt: 0.014, completion: 0.056, name: 'DeepSeek V3 (≤0.07₽)',       desc: 'GPT-4o / Claude 3.5 уровень, 0.07₽/1K' },
+    { id: 'deepseek/deepseek-r1',                        tier: 'mid',   coding: true, vision: false, prompt: 0.03,  completion: 0.06,  name: 'DeepSeek R1 (≤0.09₽)',       desc: 'Reasoning (o1-class), сложные баги/алгоритмы' },
+    { id: 'google/gemini-2.0-flash-001',                 tier: 'light', coding: true, vision: false, prompt: 0.01,  completion: 0.04,  name: 'Gemini 2.0 Flash (0.05₽)',   desc: 'Аналог Gemini Flash, 1M контекст, быстрый' },
+    { id: 'qwen/qwen-2.5-coder-32b-instruct',            tier: 'light', coding: true, vision: false, prompt: 0.01,  completion: 0.03,  name: 'Qwen 2.5 Coder 32B (0.04₽)', desc: 'Специалист по TypeScript/React, юнит-тесты' },
+    { id: 'meta-llama/llama-3.3-70b-instruct',           tier: 'mid',   coding: true, vision: false, prompt: 0.02,  completion: 0.05,  name: 'Llama 3.3 70B (0.07₽)',     desc: 'Meta, 70B — русский язык, документация, данные' },
     // Gemini через Google AI Studio (бесплатный API, 1500 запр/день, не требует карты)
     { id: 'gemini-2.0-flash',    provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.0 Flash',         desc: 'Google AI Studio ⸺ БЕСПЛАТНО 1500 запр/день, топ кодинг' },
     { id: 'gemini-2.5-flash',    provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.5 Flash',         desc: 'Google AI Studio ⸺ новейшая, мощнее Flash 2.0' },
