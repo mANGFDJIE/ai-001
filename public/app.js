@@ -2435,6 +2435,11 @@
                 let parsed;
                 try { parsed = JSON.parse(data); }
                 catch (err) { console.warn('[sse] bad chunk:', data.slice(0, 120), err.message); continue; }
+                // SSE-ошибка от провайдера (например, Gemini quota exhausted)
+                if (parsed && parsed.error) {
+                  const errMsg = parsed.error.message || parsed.error;
+                  throw new Error(errMsg);
+                }
                 const delta = parsed.choices?.[0]?.delta?.content
                            || parsed.choices?.[0]?.text
                            || '';
@@ -2453,11 +2458,17 @@
               if (!data || data === '[DONE]') continue;
               try {
                 const parsed = JSON.parse(data);
+                if (parsed && parsed.error) {
+                  const errMsg = parsed.error.message || parsed.error;
+                  throw new Error(errMsg);
+                }
                 const delta = parsed.choices?.[0]?.delta?.content
                            || parsed.choices?.[0]?.text
                            || '';
                 if (delta) full += delta;
-              } catch {}
+              } catch (e) {
+                if (e.message && !e.message.startsWith('Unexpected')) throw e;
+              }
             }
           }
           }
@@ -2474,7 +2485,36 @@
           saveMessages('assistant', full, { model: currentModel });
         } catch (e) {
           console.error(e);
-          finalizeStreaming(thinkEl, 'Ошибка DeepSeek: ' + (e.message || e), 0, decoration, true);
+          const errMsg = (e.message || '').toLowerCase() + ' ' + String(e).toLowerCase();
+          // Gemini quota/rate-limit → авто-fallback на Perplexity multi-router
+          if (errMsg.includes('quota') || errMsg.includes('rate limit') || errMsg.includes('resource exhausted') || errMsg.includes('429')) {
+            if (labelEl) labelEl.textContent = 'Gemini исчерпан → fallback на Perplexity Multi AI…';
+            const fallbackPreset = modelPresets['perplexity-multi-router'];
+            if (fallbackPreset) {
+              const reply = await runOrchestrator(content, 'multi', (status) => {
+                if (labelEl) labelEl.textContent = 'Fallback: ' + status;
+                activityTracker.push(status);
+                scrollBottom();
+              }, attachments, history);
+              if (reply && reply.text) {
+                const fChanges = extractCodeChanges(reply.text);
+                if (fChanges.length) {
+                  await applyCodeChanges(fChanges);
+                  reply.text = stripCodeFromChat(reply.text, fChanges);
+                }
+                const elapsed2 = Math.max(1, Math.round((Date.now() - start) / 1000));
+                finalizeStreaming(thinkEl, reply.text, elapsed2, 'Perplexity Multi AI', false);
+                saveMessages('assistant', reply.text, { model: 'perplexity-multi-router' });
+                if (typeof reloadPreview === 'function' && reply.text) setTimeout(reloadPreview, 300);
+              } else {
+                finalizeStreaming(thinkEl, '⚠️ Gemini quota исчерпан и fallback тоже не сработал: ' + (reply?.error || e.message || e), 0, decoration, true);
+              }
+            } else {
+              finalizeStreaming(thinkEl, '⚠️ Gemini quota исчерпан: ' + (e.message || e) + '\n\n🔑 Создай новый Gemini API-ключ: https://aistudio.google.com/apikey', 0, decoration, true);
+            }
+          } else {
+            finalizeStreaming(thinkEl, 'Ошибка: ' + (e.message || e), 0, decoration, true);
+          }
         }
         sending = false;
         sendBtn.disabled = false;

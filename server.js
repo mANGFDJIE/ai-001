@@ -518,7 +518,12 @@ app.post('/api/chat/openai', (req, res) => {
         proxyRes.on('data', (chunk) => { errBody += chunk; });
         proxyRes.on('end', () => {
           let msg = errBody;
-          try { msg = JSON.parse(errBody).error?.message || errBody; } catch {}
+          try {
+            const parsed = JSON.parse(errBody);
+            // Gemini возвращает массив [{error:{message:"..."}}]
+            if (Array.isArray(parsed)) msg = parsed[0]?.error?.message || parsed[0]?.error || errBody;
+            else msg = parsed.error?.message || parsed.error || errBody;
+          } catch {}
           if (isStream) {
             res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
             res.write('data: [DONE]\n\n');
