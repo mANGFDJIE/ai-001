@@ -22,7 +22,7 @@
   const scanBtn = document.getElementById('scanModels');
   const scanStatus = document.getElementById('scanStatus');
 
-  let currentModel = 'auto';
+  let currentModel = 'direct:google/gemini-2.5-flash-lite';
   let sending = false;
   let modelPresets = {};
   let config = { hasLocalLLM: false, llmModel: '', hasOpenAI: false, openaiBaseURL: '' };
@@ -37,6 +37,7 @@
   }
   // Короткий промпт для slim multi-запросов (≤400 токенов) — не превышает per-query лимит VseGPT 0.060₽
   const SLIM_SYSTEM_PROMPT = 'You are an AI coding agent. Code blocks MUST start with file marker: `// file: index.html` or `<!-- file: index.html -->`. Defaults: HTML→index.html, CSS→styles.css, JS→script.js. Output plain HTML+CSS+JS only (no React/Next/TS build steps). For mobile UI: 375px viewport, gradient header, bottom tab nav, rounded cards (16-24px), premium look. Max 2-4 prose sentences. Reply in Russian if asked in Russian.';
+const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS only. Every code block MUST start with file marker: // file: path or <!-- file: path --> in its first line. Defaults: index.html, styles.css, script.js. No React/Next/TS unless explicitly requested. Mobile UI: 375-430px viewport, gradient header, bottom tab nav, rounded cards (16-24px), premium look. Landing pages: hero, bento grid, features, CTA. Max 2-4 prose sentences. No intros, no follow-up questions. Reply in Russian. If a target file is explicitly specified, edit only that file.';
 
   const LLM_SYSTEM_PROMPT = 'You are an autonomous AI coding agent embedded in a web-based IDE. You build modern web apps, landing pages, dashboards, and full-stack applications.\n\n=== CODE OUTPUT (REQUIRED) ===\nWhen you return ANY code for a file, you MUST include a path marker — one of two ways:\n(1) in the info-string: ```html // file: index.html\n(2) first line inside the block: // file: index.html  OR  <!-- file: index.html -->\nWithout the marker the file will NOT save to workspace. Marker is REQUIRED for any code that lands on disk.\nDefault auto-naming: HTML → index.html, CSS → styles.css, JS → script.js, JSON → data.json.\nIf the file already exists in workspace, EDIT it — do not create a duplicate.\n\n=== PREVIEW ENVIRONMENT (CRITICAL) ===\nThe preview is a STATIC Express server that serves plain HTML/CSS/JS files from workspace/preview/.\nDO NOT generate React, Next.js, Vue, Svelte, TypeScript (.tsx/.jsx/.ts) files — they CANNOT be rendered.\nNEVER output paths like app/page.tsx, pages/index.tsx, src/App.jsx — these will show as raw code, not a page.\nALWAYS output: index.html (+ styles.css + script.js if needed). One self-contained HTML file works best.\nExceptions: only use JSX/TSX if the user explicitly says "React project" AND the workspace already has package.json with React.\n\n=== MODERN STACK (HTML-first defaults) ===\n• Structure: single index.html with embedded or linked CSS/JS — fully self-contained, no build step\n• CSS: modern CSS (custom properties, grid, flexbox, container queries, @keyframes) — NO Tailwind unless CDN-linked\n• JS: vanilla ES6+ with CDN libraries where needed (e.g. <script src="https://unpkg.com/...">)\n• Design: dark theme by default; Google Fonts via <link>; smooth CSS transitions; glassmorphism/neumorphism if "modern" requested\n• Icons: Lucide via CDN (<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js">) or inline SVG\n• Palette: sophisticated dark (#0a0a0f bg, #7c3aed accent) or premium light — avoid basic neon unless cyberpunk requested\n• Landing pages: hero with gradient text, bento grid, feature cards, social proof section, CTA — Vercel/Linear/Stripe aesthetic\n• Components: fully functional, not placeholder — real interactivity with JS where needed\n• Mobile-first responsive: use CSS clamp(), min(), max() for fluid typography; media queries for layout\n\n=== MOBILE UI LEVEL (REQUIRED) ===\nThe user expects production-quality mobile app interfaces comparable to the attached screenshots: polished profile cards, marketplace service cards, bottom tab navigation, gradient backgrounds, rounded corners, soft shadows, clear hierarchy, and premium feel. When asked for a mobile UI or mini-app, you MUST deliver at least this level:\n• Full mobile viewport simulation (width ~375-430px), centered on desktop, full bleed on mobile.\n• Header card with large gradient or photo + avatar, name, status badge, stats row (likes, views, matches).\n• Rounded large cards (border-radius 16-24px) with soft shadows, clear sections, and ample whitespace.\n• Bottom tab navigation with 3-5 icons and active state indicator.\n• Top-tier typography: bold headings, subtle labels, harmonious Russian text.\n• Material 3 / iOS style: switch toggles, list items with chevrons, icons from Lucide.\n• Color: either vibrant gradient (pink, blue, purple) or premium dark theme; avoid flat, ugly, default browser styles.\n• If a screenshot/reference is attached, replicate its visual structure, proportions, and color mood — not just the layout idea.\n\n=== TONE (STRICT) ===\nWrite like a Replit agent engineer. Max 2-4 prose sentences. No leads (Let us, Well, Currently I, I will review, We should, Here is my plan, Let us begin). No explaining the obvious. No follow-up questions.\nFormat: what changed (filename — one-line gist, comma-separated if multiple). If error: one sentence on what failed.\n\n=== TARGET-FILE RULE ===\nWhen user-content carries a [🎯 ЦЕЛЬ ОПЕРАЦИИ] block with explicit Fayl-cel: ...path.ext, edit STRICTLY that file. Do not ask which file. Just modify it.\n\n=== SELECTED-ELEMENT HINT ===\nIf user mentions ⌖ <tag> in their text, treat it as a soft pointer to the attached selected-element chip. Use pagePath from the chip, not inferred from tag.\n\nReply in Russian if the request is in Russian.\n';
 
@@ -75,16 +76,16 @@
   }
 
   async function attachImagesToUser(text, atts) {
-    const imgs = (atts || []).filter(a => a && /^image\//i.test(a.type || '') && a.dataUrl).slice(0, 4);
+    const imgs = (atts || []).filter(a => a && /^image\//i.test(a.type || '') && a.dataUrl).slice(0, 2);
     if (!imgs.length) return text;
     const parts = [];
     if (text) parts.push({ type: 'text', text });
     for (const a of imgs) {
       let url = a.dataUrl;
-      if (url.length > 600000) {
-        url = await downsampleImage(url, 1024, 0.7);
+      if (url.length > 400000) {
+        url = await downsampleImage(url, 768, 0.7);
       }
-      if (url.length > 900000) {
+      if (url.length > 600000) {
         // Даже после downsample картинка огромная — не пихаем её в контекст,
         // только текстовое предупреждение для модели.
         const name = a.name || a.path || 'image';
@@ -143,32 +144,13 @@
         local: true
       };
     }
-    // Если облачный провайдер доступен — по умолчанию стартуем с ⭐ Мульти AI.
-    if (config.hasOpenAI && (currentModel === 'auto' || currentModel === 'orchestrator' || currentModel === 'openai-chat' || currentModel === 'deepseek-reasoner' || currentModel.startsWith('featured-'))) {
-      currentModel = 'multi';
-    }
-
     // Add OpenAI-compatible models (DeepSeek, OpenAI, OpenRouter…)
     if (config.hasOpenAI) {
-      // ── Авто — лёгкий роутер сам выбирает 1–3 модели под задачу и бюджет.
-      modelPresets['auto'] = {
-        name: '⭐ Авто', label: '⭐ Авто', color: 'auto',
-        desc: 'Роутер (GPT-4.1 Nano) оценивает задачу и подключает 1–3 дешёвые модели для лучшего результата',
-        openai: true,
-        apiModel: 'openai/gpt-4.1-nano',
-        router: 'auto',
-        featured: true
-      };
-      // ── Мульти AI — параллельно 2–3 умные модели + vision при скриншотах.
-      modelPresets['multi'] = {
-        name: '⭐ Мульти AI', label: '⭐ Мульти AI', color: 'pro',
-        desc: 'Параллельно 2–3 модели + vision для скриншотов; синтез лучшего ответа',
-        openai: true,
-        apiModel: 'openai/gpt-4.1-nano',
-        router: 'multi',
-        featured: true
-      };
-
+      // Авто и Мульти AI отключены: теперь только прямой выбор конкретной модели.
+      // Default — google/gemini-2.5-flash-lite как надёжный и дешёвый кодер.
+      if (currentModel === 'auto' || currentModel === 'multi' || currentModel === 'orchestrator' || currentModel === 'openai-chat' || currentModel === 'deepseek-reasoner' || currentModel.startsWith('featured-')) {
+        currentModel = 'direct:google/gemini-2.5-flash-lite';
+      }
     }
 
     renderModelDropdown();
@@ -693,9 +675,12 @@
     }
   }
   async function buildWorkspaceContextMessages() {
-    const snap = await loadWorkspaceSnapshot();
-    if (!snap || !snap.contextText) return [];
-    return [{ role: 'system', content: 'Текущее состояние проекта (workspace). Используй как контекст. Прежде чем создавать файлы, проверь — нет ли уже подходящего, и не дублируй содержимое.\n\n' + snap.contextText }];
+    const snap = await loadWorkspaceSnapshot({ maxAgeMs: 15000 });
+    if (!snap || !snap.files) return [];
+    const fileList = snap.files.map(f => f.path + ' (' + f.size + ' байт)').join('\n');
+    const content = 'Файлов в проекте: ' + (snap.totalFiles || 0) + '\n' + fileList +
+      (snap.skipped && snap.skipped.length ? '\n\nПропущены (слишком большие): ' + snap.skipped.map(s => s.path).join(', ') : '');
+    return [{ role: 'system', content: 'Текущее состояние проекта (workspace). Используй как контекст. Прежде чем создавать файлы, проверь — нет ли уже подходящего, и не дублируй содержимое.\n\n' + content }];
   }
 
   function showEmptyState() {
@@ -806,9 +791,9 @@
     const modelLogo = document.getElementById('modelLogo');
     if (!activeModelLabel || !modelLogo) return;
     const model = findModelById(modelId);
-    const displayLabel = label || model?.label || 'Авто';
+    const displayLabel = label || model?.label || 'gemini-2.5-flash-lite';
     const key = model?.key || currentModel;
-    const type = model?.color || (currentModel === 'auto' ? 'auto' : 'auto');
+    const type = model?.color || 'standard';
     const color = colorMap[type] || colorMap.auto;
     activeModelLabel.textContent = displayLabel;
     if (activeModelType) {
@@ -818,7 +803,7 @@
     }
     if (activeModelDesc) {
       const taskDesc = tagsToTasks(model?.tags || modelPresets[currentModel]?.tags);
-      activeModelDesc.textContent = taskDesc || model?.desc || modelPresets[currentModel]?.desc || 'Автоподбор модели по типу задачи и сложности';
+      activeModelDesc.textContent = taskDesc || model?.desc || modelPresets[currentModel]?.desc || 'Выбранная модель';
     }
     modelLogo.textContent = modelLogoLetter(key, displayLabel);
     modelLogo.style.background = color;
@@ -852,7 +837,7 @@
   }
 
   function updateModelDisplay() {
-    const p = modelPresets[currentModel] || { label: 'Авто', color: 'auto', desc: 'Автоподбор модели по типу задачи и сложности' };
+    const p = modelPresets[currentModel] || modelPresets['direct:google/gemini-2.5-flash-lite'] || { label: 'gemini-2.5-flash-lite', color: 'standard', desc: 'Выбранная модель' };
     const color = colorMap[p.color] || colorMap.auto;
     modelLabel.textContent = p.label;
     modelDot.style.background = color;
@@ -1694,7 +1679,7 @@
     const attachHistory = async () => {
       // Исторические картинки НЕ передаём повторно — они раздувают контекст
       // до 5+ ₽ за запрос. Оставляем только текстовые описания.
-      const hist = (history || []).slice(-10);
+      const hist = (history || []).slice(-3);
       return hist.map(m => ({
         role: m.role,
         content: (m.role === 'user' && m.attachments && m.attachments.length)
@@ -1706,7 +1691,7 @@
       const realId = pickVision(id, true);
       const supportsVision = !!ORCHESTRATOR_MODELS.find(m => m.id === realId)?.vision;
       return [
-        { role: 'system', content: LLM_SYSTEM_PROMPT + '\n\n(Запрос делегирован оркестратором модели ' + realId + '.)' },
+        { role: 'system', content: COMPACT_SYSTEM_PROMPT + '\n\n(Запрос делегирован оркестратором модели ' + realId + '.)' },
         ...ctx,
         ...(await attachHistory(supportsVision)),
         { role: 'user', content: await userContentFor(content, attachments, supportsVision) }
@@ -1971,7 +1956,7 @@
       window.__clearPendingAttachments && window.__clearPendingAttachments();
     }
 
-    const selectedPreset = modelPresets[currentModel] || modelPresets.auto || { name: 'Авто' };
+    const selectedPreset = modelPresets[currentModel] || modelPresets['direct:google/gemini-2.5-flash-lite'] || { name: 'gemini-2.5-flash-lite' };
 
     // DeepSeek / local LLM работают без WebGPU
     const isApiModel = selectedPreset.openai || selectedPreset.local;
@@ -2004,7 +1989,7 @@
 
     try {
       // Choose model: explicit preset, or auto-pick by task × complexity.
-      if (currentModel === 'auto') {
+      if (currentModel.startsWith('direct:')) {
         autoInfo = await llm.pickAuto(content);
         modelId = autoInfo.model_id;
         decoration = `Авто: ${autoInfo.label}`;
@@ -2049,7 +2034,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               messages: [
-                { role: 'system', content: LLM_SYSTEM_PROMPT },
+                { role: 'system', content: COMPACT_SYSTEM_PROMPT },
                 ...contextMessages,
                 ...history.map(m => ({ role: m.role, content: m.content }))
               ],
@@ -2120,7 +2105,7 @@
             }
             // Шапку возвращаем в нормальное AUTO-состояние (модель только что
             // поработала, теперь снова ждёт следующего запроса).
-            try { setActiveModel('auto', 'Авто'); } catch (_) {}
+            try { setActiveModel('direct:google/gemini-2.5-flash-lite', 'gemini-2.5-flash-lite'); } catch (_) {}
           } else {
             // ── Прямой SSE-стрим к выбранной модели ────────────────
             // Шлём реальный id модели у провайдера (deepseek-chat / deepseek-reasoner),
@@ -2289,7 +2274,7 @@
       const elapsed = Math.max(1, Math.round((Date.now() - start) / 1000));
       const cls = window.WEBLLM_classify?.(content) || {};
 
-      if (window.SupabaseSync?.enabled && currentModel === 'auto' && autoInfo) {
+      if (window.SupabaseSync?.enabled && currentModel.startsWith('direct:') && autoInfo) {
         window.SupabaseSync.markModelLoaded(modelId, autoInfo.label, autoInfo.vram).catch(() => {});
       }
 
@@ -2408,17 +2393,9 @@
     } else if (/Синтез/.test(status)) {
       label = 'Синтез'; badge = 'Router';
       sub = 'Сильные стороны: ' + (STRENGTHS['openai/gpt-4.1-nano'] || 'роутер, 1M контекст');
-    } else if (/Параллельный/i.test(status)) {
-      label = 'Мульти AI'; badge = 'Multi';
-      const ids = (status.match(/(\w+\/\w+(?:-\w+)*(?:-[\d.]+)?(?:-thinking-high)?)/g) || []).filter(x => STRENGTHS[x]).slice(0, 2);
-      if (ids.length) {
-        sub = 'Сильные стороны: ' + ids.map(x => STRENGTHS[x]).join(' / ');
-      } else {
-        sub = 'Несколько моделей работают параллельно';
-      }
-    } else if (/часть моделей/i.test(status)) {
-      label = 'Мульти AI'; badge = 'Multi';
-      sub = 'Сильные стороны: ' + (STRENGTHS['mistralai/devstral-small'] || 'код, UI, лендинги');
+    } else if (/Параллельный/i.test(status) || /часть моделей/i.test(status)) {
+      // Мульти-AI отключён; эти статусы больше не должны появляться.
+      return;
     } else {
       return;
     }
