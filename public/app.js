@@ -953,7 +953,47 @@
         changes.push({ path: 'image.svg', content: trimmed, lang: 'xml' });
       }
     }
-    return changes;
+    // ── Normalize paths so the static preview can render what we save ──
+    // LLM часто выдаёт Next.js / React / Svelte / Vue файлы, которые статический
+    // Express-превью НЕ умеет рендерить. Поэтому перед записью:
+    //   1) срезаем framework-префиксы (`app/`, `src/`, `pages/`, `components/`, `public/`)
+    //   2) `.tsx`/`.jsx`/`.vue`/`.svelte`/`.astro` → `.html`, ЕСЛИ содержимое похоже
+    //      на HTML (есть теги) и не содержит ESM-импортов
+    //   3) чистый `.ts` отбрасываем — Node-статикой всё равно не выполнится
+    //   4) чистый JSX/TSX (`import React`, `export default function`, 'use client')
+    //      отбрасываем — даже после переименования не отрендерится
+    //   5) де-дупликация по итоговому пути
+    const FRAMEWORK_PREFIX = /^(app|pages|src|components|public)\//i;
+    const REWRITE_EXT = /\.(tsx|jsx|vue|svelte|astro)$/i;
+    const TS_ONLY_EXT = /\.(ts)$/i;
+    const normalized = [];
+    const seen = Object.create(null);
+    for (const c of changes) {
+      let p = String(c.path || '').trim();
+      if (!p) continue;
+      const content = String(c.content || '').trim();
+      const looksLikeFramework = /^\s*import\s+(React|[\{\*])/m.test(content)
+                              || /^\s*['"]use\s+client['"]/m.test(content)
+                              || /^\s*export\s+default\s+(function\s+\w+|class\s+\w+|\(\w*\s*=>)/m.test(content)
+                              || /^\s*<\?xml\b/im.test(content);
+      if (looksLikeFramework) continue;
+      if (TS_ONLY_EXT.test(p)) continue;
+      // срезаем framework prefix ДО проверки расширения
+      p = p.replace(FRAMEWORK_PREFIX, '');
+      if (REWRITE_EXT.test(p)) {
+        const hasTags = /<\/?[a-z][^>]*>/i.test(content);
+        const hasEsmImport = /^\s*(import|export)\s/m.test(content);
+        if (!hasTags || hasEsmImport) continue;
+        p = p.replace(REWRITE_EXT, '.html');
+      }
+      // защищаемся от выхода из workspace
+      p = p.replace(/^\.+/, '').replace(/^\/+/, '');
+      if (!p) continue;
+      const dupCount = (seen[p] = (seen[p] || 0) + 1);
+      // первый — оставляем, повторы скипаем
+      if (dupCount === 1) normalized.push({ ...c, path: p });
+    }
+    return normalized;
   }
 
   async function applyCodeChanges(changes) {
