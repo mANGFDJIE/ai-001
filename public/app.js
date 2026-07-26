@@ -116,15 +116,34 @@
       config = await r.json();
     } catch {}
 
-    // Загружаем каталог моделей (бесплатно) и обновляем ростер оркестратора.
+    // Загружаем курированный ростер (с сервера, scout-LLM ранжировала)
+    // и fallback на старый /api/models если scout-индекс ещё пуст.
     async function scanModelCatalog() {
       try {
-        const mr = await fetch('/api/models');
-        const modelsData = await mr.json();
-        if (modelsData && Array.isArray(modelsData.data)) {
-          refreshOrchestratorModels(modelsData.data);
+        let modelsData = null;
+        // 1) Приоритет — серверный scout (бесплатная LLM раз в час обновляет).
+        try {
+          const mr = await fetch('/api/scout-models');
+          if (mr.ok) {
+            const j = await mr.json();
+            if (j && Array.isArray(j.data) && j.data.length) modelsData = j.data;
+          }
+        } catch {}
+        // 2) Fallback — прямой /v1/models + клиентский heuristic.
+        if (!modelsData) {
+          try {
+            const mr2 = await fetch('/api/models');
+            if (mr2.ok) {
+              const j = await mr2.json();
+              if (j && Array.isArray(j.data)) modelsData = j.data;
+            }
+          } catch {}
+        }
+        if (modelsData && modelsData.length) {
+          refreshOrchestratorModels(modelsData);
           rebuildDirectModelPresets();
           renderModelDropdown();
+          console.log('[models] ростер обновлён:', modelsData.length);
         }
       } catch (e) { console.log('[models] авто-сканер не смог загрузить каталог:', e); }
     }

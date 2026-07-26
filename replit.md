@@ -96,4 +96,21 @@ Sync идёт через **серверный proxy** (`/api/sync/*` в `server.
 | Qwen3 32B / 14B / 8B / 4B / 1.7B | 1.3–18 ГБ | 2025 |
 | Llama 3.1 8B / 3.2 3B / 3.2 1B | 0.9–5 ГБ | Meta |
 | Gemma 3 12B / 4B | 2.8–7.5 ГБ | Google 2025 |
-| Mistral 7B v0.3 / Ministral 3B | 2.2–4.5 ГБ | Mistral AI |
+| Mistral 7B v0.3 / Ministral 3B | 2.2–4.5 ГБ | Mistral AI
+
+## Модели — авто-курирование (с 26 июля 2026)
+
+Ростер моделей больше **НЕ захардкожен в `public/app.js`**. Сервер `server.js` раз в час опрашивает `GET /v1/models` провайдера и двухуровнево ранжирует кандидатов под наш сценарий:
+
+1. **Детерминированный ранг (0₽, канонично):** vision + coding сигналы + бонус за бесплатные/дешёвые модели (≤0.015₽/1K), штраф за дорогие. Без внешних вызовов, не падает на soft-limit.
+2. **Опциональный LM-скор сверху (только если pre-flight ≤0.05₽):** короткий запрос к `perplexity/latest-small-online`. Если upstream поднимает «soft user limit» (≥0.07₽/query) или pre-flight показал, что запрос дороже 0.05₽ — LM-шаг скипается, остаёмся на детерминированной разметке.
+
+Фильтр **до** ранжирования: prompt+completion ≤ 0.06₽/1K (`BUDGET_RUB`-1¢ запас на retry), пропускаем embedding/img2/tts/embedding префиксы. Отбрасываем модели со score < 6. Курированный ростер сохраняется в `workspace/state/roster.json` с timestamp; клиент берёт свежий список через `GET /api/scout-models` без перезапуска сервера.
+
+Endpoint:
+- `GET /api/scout-models` → `{ data: [{id, prompt, completion, vision, coding, score}], cached, refreshing, ageMs, model }`
+- Холодный кеш → `202 { refreshing: true }` и асинхронный прогрев.
+- Hourly cron на сервере (`setInterval(refreshScout, 60min)` — `.unref()`).
+- Клиент: основной путь `/api/scout-models`; fallback `/api/models` (старый regex-heuristic) сохраняется на случай, если серверный scout ещё не прогрелся.
+
+Сценарий: «Хочу модель, которая читает картинку → делает страницу 1:1.» — vision-фильтр из топ-5 ростера. |

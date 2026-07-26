@@ -779,6 +779,157 @@ function defaultIndexHtml() {
 </html>`;
 }
 
+// ── Scout — server-side model curator (бесплатная LLM, ежечасно) ──
+// Источник истины для ростера оркестратора. Не зависит от клиента:
+// на сервере setInterval раз в час опрашивает /v1/models провайдера,
+// фильтрует дешёвые модели (≤0.06₽/запрос → < BUDGET_RUB=0.07₽ с запасом),
+// а потом прогоняет выживших через бесплатную «scout»-модель
+// (perplexity/latest-small-online, 0₽ prompt+completion, есть веб-поиск),
+// которая ранжирует кандидатов для нашего сценария: (а) генерация UI/лендингов/
+// TMA мини-аппсов по тексту, (б) генерация страницы ТОЧНО ПО скриншоту (vision+code).
+// Кандидаты со score ≥ 6 сохраняются в workspace/state/roster.json с timestamp.
+// Клиент берёт через GET /api/scout-models — там есть ageMs, refreshing, model.
+// Если scout-LM не отвечает — fallback на heuristic-only фильтр (без score).
+const SCOUT_MODEL = process.env.SCOUT_MODEL || 'perplexity/latest-small-online';
+const ROSTER_PATH = path.join(__dirname, 'workspace', 'state', 'roster.json');
+const SCOUT_CACHE_MS = 60 * 60 * 1000;
+
+async function readRosterState() {
+  try { return JSON.parse(await fs.readFile(ROSTER_PATH, 'utf8')); }
+  catch { return { scout: [], scoutAt: 0 }; }
+}
+async function writeRosterState(st) {
+  try {
+    await fs.mkdir(path.dirname(ROSTER_PATH), { recursive: true });
+    await fs.writeFile(ROSTER_PATH, JSON.stringify(st, null, 2));
+  } catch (e) { console.warn('[scout] save failed:', e.message); }
+}
+
+function heuristicCandidate(m) {
+  if (!m || typeof m !== 'object' || typeof m.id !== 'string') return null;
+  const id = m.id;
+  if (!/^(openai|google|qwen|deepseek|meta-llama|mistralai|anthropic|perplexity|vis-|amazon|cohere|xai|moonshotai|minimax|xiaomi|nvidia)/i.test(id)) return null;
+  if (/^(emb-|text-embedding|img-|img2|txt2|tta-|tts-|stt-|utils\/|whisper|dall-?e)/i.test(id)) return null;
+  const p = parseFloat(m.pricing?.prompt || 0);
+  const c = parseFloat(m.pricing?.completion || 0);
+  if (!isFinite(p) || !isFinite(c) || p + c > 0.06) return null;
+  const feats = Array.isArray(m.features) ? m.features : [];
+  const visionHint = /(vision|vl\b|^vis-|gemini|gpt-?4o|gpt-?5\b|llama-3\.2|qwen.*vl|pixtral|opus|haiku|gpt-oss)/i.test(id)
+                  || feats.includes('vision');
+  const codingHint = /(coder|code|instruct|chat\b|sonnet|opus|haiku|mini|gpt-?4o-mini|nano|flash|lite|scout|maverick|deepseek|qwq|devstral|pixtral|mistral-small|qwen3|qwen-?2\.5|llama-?4|nova|mistral)/i.test(id)
+                  || feats.includes('tools') || feats.includes('structured');
+  if (!visionHint && !codingHint) return null;
+  return { id, prompt: p, completion: c, vision: visionHint, coding: codingHint };
+}
+
+async function fetchProviderCatalog() {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.VSEGPTRU;
+  if (!apiKey) throw new Error('no API key');
+  const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');
+  const r = await fetch(baseURL + '/models', { headers: { Authorization: 'Bearer ' + apiKey } });
+  if (!r.ok) throw new Error('catalog ' + r.status);
+  return r.json();
+}
+
+async function llmComplete(messages, opts) {
+  opts = opts || {};
+  const apiKey = process.env.OPENAI_API_KEY || process.env.VSEGPTRU;
+  const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');
+  const body = JSON.stringify({ model: SCOUT_MODEL, messages, temperature: opts.temperature ?? 0.1, max_tokens: opts.max_tokens ?? 2000 });
+  const r = await fetch(baseURL + '/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+    body,
+  });
+  if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error('upstream ' + r.status + ' ' + t.slice(0,200)); }
+  const j = await r.json();
+  return (j.choices?.[0]?.message?.content || '').trim();
+}
+
+async function refreshScout() {
+  if (!process.env.OPENAI_API_KEY && !process.env.VSEGPTRU) return;
+  try {
+    const cat = await fetchProviderCatalog();
+    if (!cat || !Array.isArray(cat.data)) return;
+    const candidates = cat.data.map(heuristicCandidate).filter(Boolean);
+    if (!candidates.length) { console.log('[scout] 0 кандидатов после heuristic'); return; }
+    // Двухуровневое ранжирование. По умолчанию — детерминированная оценка (0₽),
+// поверх неё — опциональный LM-скор, но только если pre-flight ≤0.05₽.
+    // Если провайдер поднимает «soft user limit», LM-шаг пропускается и остаёмся
+    // на детерминированной разметке. Это удерживает scout в рамках бюджета.
+    function heuristicScore(c) {
+      const id = String(c.id || '').toLowerCase();
+      let s = 5; // baseline
+      if (c.vision) s += 2;
+      if (/^(vis-|vis_|^vision|vl\b|gemini|gpt-?4o|gpt-?5|llama-3\.2-11b|pixtral|qwen.*vl|claude-?3\.5|opus|haiku)/.test(id)) s += 1;
+      if (/coder|code-?(?:instruct|chat)|coder-?(?:7|32)b|deepseek-?(?:coder|chat|reasoner|v3|v4)/.test(id)) s += 2;
+      if (c.coding) s += 1;
+      if (/qwen3|qwen-?2\.5-coder|devstral|mistral-small/.test(id)) s += 1;
+      if (c.prompt === 0 && c.completion === 0) s += 2;        // бесплатные
+      const sum = c.prompt + c.completion;
+      if (sum <= 0.015) s += 1; else if (sum > 0.04) s -= 1;   // дешёвые в плюс, дорогие — штраф
+      return Math.max(0, Math.min(10, s));
+    }
+    const scoreMap = new Map();
+    for (const c of candidates) scoreMap.set(c.id, heuristicScore(c));
+
+    try {
+      const sys = 'Эксперт LLM. Оцени id 1..10 для UI/лендингов/image-to-page. JSON [{"id":"...","score":N}].';
+      const userTxt = candidates.slice(0, 12).map(c =>
+        `${c.id} ${c.vision?'v':''} sum=${(c.prompt+c.completion).toFixed(3)}`
+      ).join('\n');
+      // Жёсткий pre-flight: даже гипотетический счёт >0.05₽ → не дёргаем LM.
+      const estCost = sys.length / 4 * 0.015 / 1000 + userTxt.length / 4 * 0.015 / 1000
+                     + 200 * 0.06 / 1000;
+      if (estCost > 0.05) {
+        console.log('[scout] LM-скор пропущен: pre-flight=' + estCost.toFixed(4) + '₽ > 0.05₽');
+      } else {
+        const txt = await llmComplete([{role:'system',content:sys},{role:'user',content:userTxt}], { temperature: 0.1, max_tokens: 200 });
+        const m = txt.match(/\[\s*\{[\s\S]*?\}\s*\]/);
+        if (m) {
+          const parsed = JSON.parse(m[0]);
+          if (Array.isArray(parsed)) {
+            for (const p of parsed) {
+              const id = String(p.id || '').trim();
+              if (!id) continue;
+              const lm = parseFloat(p.score) || 0;
+              if (lm > 0) scoreMap.set(id, lm);
+            }
+          }
+        }
+      }
+    } catch (e) { console.warn('[scout] LM-скор fallback, остался deterministic:', e.message); }
+    const merged = candidates.map(c => ({ ...c, score: scoreMap.get(c.id) || 0 }));
+    const kept = scoreMap.size > 0 ? merged.filter(c => c.score >= 6) : merged;
+    const curated = kept
+      .sort((a, b) => (b.score - a.score) || ((a.prompt + a.completion) - (b.prompt + b.completion)))
+      .slice(0, 30);
+    if (!curated.length) return;
+    await writeRosterState({ scout: curated, scoutAt: Date.now(), model: SCOUT_MODEL });
+    console.log('[scout] ростер обновлён:', curated.length, 'моделей' +
+      (scoreMap.size ? ` (top=${curated[0].score}, min=${curated[curated.length-1].score})` : ' [heuristic-only]'));
+  } catch (e) { console.warn('[scout] refresh failed:', e.message); }
+}
+
+app.get('/api/scout-models', async (req, res) => {
+  try {
+    const st = await readRosterState();
+    const age = Date.now() - (st.scoutAt || 0);
+    const fresh = st.scout && st.scout.length && age < SCOUT_CACHE_MS;
+    if (fresh) return res.json({ data: st.scout, cached: true, ageMs: age, model: st.model });
+    setImmediate(() => { refreshScout().catch(() => {}); });
+    if (st.scout && st.scout.length) {
+      return res.json({ data: st.scout, cached: true, refreshing: true, ageMs: age, model: st.model });
+    }
+    res.status(202).json({ data: [], refreshing: true, model: st.model });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Cold-start через 3 секунды (не блокирует listen) + hourly unref-таймер.
+setTimeout(() => { refreshScout().catch(() => {}); }, 3000);
+const scoutTimer = setInterval(() => { refreshScout().catch(() => {}); }, SCOUT_CACHE_MS);
+if (scoutTimer.unref) scoutTimer.unref();
+
 app.listen(PORT, '0.0.0.0', () => {
   const hasOpenAI = !!(process.env.OPENAI_API_KEY || process.env.VSEGPTRU);
   const openaiBaseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');

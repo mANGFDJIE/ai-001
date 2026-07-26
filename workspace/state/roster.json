@@ -1,0 +1,70 @@
+{
+  "scout": [
+    {
+      "id": "meta-llama/llama-3.2-3b-instruct",
+      "prompt": 0.015,
+      "completion": 0.015,
+      "vision": true,
+      "coding": true,
+      "score": 0
+    },
+    {
+      "id": "amazon/nova-micro-v1",
+      "prompt": 0.012,
+      "completion": 0.03,
+      "vision": false,
+      "coding": true,
+      "score": 0
+    },
+    {
+      "id": "qwen/qwen3-14b",
+      "prompt": 0.012,
+      "completion": 0.033,
+      "vision": false,
+      "coding": true,
+      "score": 0
+    },
+    {
+      "id": "qwen/qwen-turbo-2024-11-01",
+      "prompt": 0.016,
+      "completion": 0.035,
+      "vision": false,
+      "coding": true,
+      "score": 0
+    },
+    {
+      "id": "google/gemini-flash-1.5-8b",
+      "prompt": 0.015,
+      "completion": 0.04,
+      "vision": true,
+      "coding": true,
+      "score": 0
+    },
+    {
+      "id": "amazon/nova-lite-v1",
+      "prompt": 0.02,
+      "completion": 0.04,
+      "vision": false,
+      "coding": true,
+      "score": 0
+    },
+    {
+      "id": "mistralai/devstral-small",
+      "prompt": 0.015,
+      "completion": 0.045,
+      "vision": false,
+      "coding": true,
+      "score": 0
+    },
+    {
+      "id": "mistralai/mistral-small-3.2-24b-instruct",
+      "prompt": 0.015,
+      "completion": 0.045,
+      "vision": false,
+      "coding": true,
+      "score": 0
+    }
+  ],
+  "scoutAt": 1785041235601,
+  "model": "perplexity/latest-small-online"
+}
