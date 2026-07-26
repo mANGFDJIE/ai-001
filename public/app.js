@@ -1451,11 +1451,39 @@
 
   function stripCodeFromChat(text, changes) {
     if (!text) return text;
-    // Всегда режем fenced-блоки из чата — даже если extractCodeChanges их не
-    // распознал (бывает у нестандартных провайдеров / нетипичных форматов).
-    // Если файл распознан — дописываем в конец список записанных файлов.
+    // 1) ``` fences — стандарт; их гарантированно игнорируем (код уже в workspace).
     let out = text.replace(/```[\s\S]*?```/g, '');
-    out = out.replace(/\n{3,}/g, '\n\n').trim();
+    // 2) Сырой код БЕЗ ```-fence'ов: модель иногда вставляет 10-30 строк
+    // JS/HTML/CSS прямо в prose ответа (как в скриншоте «document.addEventListener…»
+    // вёрсткой по 200 строк в чате). Дропаем любой непрерывный блок, где ≥3
+    // подряд строк выглядят как код — длинные вставки. Короткие code-намеки
+    // («поменяй `const x = 1`») НЕ трогаем, иначе развалим короткие ответы.
+    const RE_CODE = /^\s*(?:function\b|const\s|let\s|var\s|class\b|import\b|export\s|document\.\w|window\.\w|return\s|=>|\{|\}|<\/?[a-zA-Z!]|---|\/\*|\/\/|\}\s*[\);]*$|\)\s*;?\s*$|\d+\.\s*$)/;
+    const lines = out.split('\n');
+    const kept = [];
+    let block = [];
+    const flush = () => {
+      if (block.length >= 3) { /* дропаем */ }
+      else for (const l of block) kept.push(l);
+      block = [];
+    };
+    for (const line of lines) {
+      if (RE_CODE.test(line)) {
+        block.push(line);
+      } else if (block.length && line.trim() === '') {
+        // пустая строка внутри code-блока — продолжаем дроп, чтобы блок шёл одним куском
+        block.push(line);
+      } else {
+        flush();
+        kept.push(line);
+      }
+    }
+    flush();
+    out = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (!out) out = 'Готово.';
+    // Дополнительная вырезка: одиночные пунктуационные остатки кода
+    // (';', ')}', '};' на отдельной строке) — типичный мусор после truncate.
+    out = out.split('\n').filter(l => !/^[\s]*[;{}()~`]+[\s]*$/.test(l.trim())).join('\n').trim();
     if (!out) out = 'Готово.';
     const list = changes && changes.length ? changes.map(c => '`' + c.path + '`').join(', ') : '';
     return list ? (out + '\n\n📁 **Записано в workspace**: ' + list + '\n') : out;
