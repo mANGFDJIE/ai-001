@@ -148,7 +148,7 @@
       // ── Мульти-агент — лёгкий роутер, всегда параллельно опрашивает 2–3 модели.
       modelPresets['multi'] = {
         name: '⭐ Мульти-агент', label: '⭐ Мульти-агент', color: 'pro',
-        desc: 'Роутер (GPT-4.1 Nano) параллельно опрашивает 2–3 модели и синтезирует лучший ответ (≤0.2₽/запрос)',
+        desc: 'Роутер (GPT-4.1 Nano) параллельно опрашивает 2–3 модели и синтезирует лучший ответ (параллельно 2–3 модели)',
         openai: true,
         apiModel: 'openai/gpt-4.1-nano',
         router: 'multi',
@@ -668,7 +668,7 @@
         parts.push('--- END FILE: ' + f.path + ' ---');
       }
       if (data.skipped && data.skipped.length) {
-        parts.push('\nПропущены (слишком большие / превышен бюджет): ' + data.skipped.map(s => s.path + ' [' + s.reason + ']').join(', '));
+        parts.push('\nПропущены (слишком большие): ' + data.skipped.map(s => s.path + ' [' + s.reason + ']').join(', '));
       }
       const snapshot = Object.assign({}, data, { contextText: parts.join('\n') });
       window._workspaceSnapshot = snapshot;
@@ -1285,7 +1285,7 @@
   // Эвристика: похоже, что задача требует кода (UI/правки/создание).
   // Используется в делегате/мульти, чтобы ПЕРЕПРОСИТЬ модель, если она вернула prose без кода.
   // Провайдер (vsegpt) возвращает разные сообщения, когда модель недоступна
-  // по бюджету: «Exceeded soft user limit», «expected price», и т.п.
+  // по лимиту: «Exceeded soft user limit», «expected price», и т.п.
   // Ловим одной предикатной функцией — единое правило fallback.
   function isBudgetOrModelError(msg) {
     if (!msg) return false;
@@ -1309,7 +1309,7 @@
   }
   function isAvailableModel(id) { return !unavailableModels().has(id); }
 
-  // Когда бюджет VseGPT «Exceeded soft user limit» — пробовать тот же тяжёлый
+  // Когда VseGPT «Exceeded soft user limit» — пробовать тот же тяжёлый
   // delegateMessages с полным workspace-контекстом бессмысленно (входной контекст
   // стоит денег, и даже дешёвая модель перевалит за 10 ₽). Для таких случаев —
   // облегчённая версия без buildWorkspaceContextMessages(): только system prompt
@@ -1326,7 +1326,7 @@
         listingLine = 'Список файлов в workspace (только эти пути существуют; не придумывай новые): '
           + snap.files.map(f => f.path + ' (' + f.size + ' Б)').join(', ');
         if (snap.totalFiles && snap.totalFiles > snap.files.length) {
-          listingLine += ' (+ ещё файлов за пределами бюджета контекста, не показываю).';
+          listingLine += ' ((+ ещё файлов за пределами контекста, не показываю)..';
         }
       } else {
         listingLine = 'Снимок workspace сейчас недоступен — действуй только с теми файлами, что упомянуты в [🎯 ЦЕЛЬ ОПЕРАЦИИ] или прямо в запросе. Не придумывай пути вроде app/page.tsx.';
@@ -1368,7 +1368,7 @@
   // Ростер моделей для авто-оркестратора (VseGPT-базовый тариф).
   //
   // Дешёвые модели ВЫШЕ, дорогие НИЖЕ. Router (deepseek-coder) выбирает
-  // по цене-вверху: бюджет тратится на дорогое только при провале дешёвых. Vision-фильтр `pickVision` тоже идёт сверху — теперь
+  // по цене-вверху. Vision-фильтр `pickVision` тоже идёт сверху — теперь
   // Sonnet 4.6 H идёт первым при наличии картинки.
   //
   // coding=true  -> сильный современный код/UI/архитектура (агентская работа).
@@ -1380,14 +1380,14 @@
   //   reasoning-> пошаговое планирование.
   // Ordered by cost (ascending) — router prefers cheapest model that can handle the task.
   // Falls back up the list on budget/availability errors (isBudgetOrModelError).
-  // Бюджет на один запрос (руб). 0.2₽ ≈ 2–3 параллельные модели.
+  // Бюджет на один запрос (руб).
   const BUDGET_RUB = 0.2;
   // Цены prompt/completion в ₽ за 1000 токенов — актуальны для VseGPT.ru на момент правки.
   // Сортировка: сначала сильные дешёвые, потом мощнее. Router идёт сверху вниз.
   // Модели, которые требуют апгрейда плана (например, perplexity online, gpt-5-nano),
   // исключены из baseline — авто-сканер может добавить их, если они станут доступны.
   const BASELINE_ORCHESTRATOR_MODELS = [
-    // 0.015–0.075₽/1K — топ-дешёвые сильные кодеры
+    // топ-дешёвые сильные кодеры
     { id: 'openai/gpt-4.1-nano',             tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.06  },
     { id: 'openai/gpt-oss-20b',              tier: 'mid',   coding: true,  vision: false, prompt: 0.014, completion: 0.06  },
     { id: 'openai/gpt-oss-120b',             tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.065 },
@@ -1396,7 +1396,7 @@
     { id: 'qwen/qwen3-32b',                 tier: 'mid',   coding: true,  vision: false, prompt: 0.015, completion: 0.055 },
     { id: 'openai/gpt-oss-120b-fast',        tier: 'mid',   coding: true,  vision: false, prompt: 0.021, completion: 0.085 },
     { id: 'meta-llama/llama-4-scout',        tier: 'mid',   coding: true,  vision: false, prompt: 0.022, completion: 0.08  },
-    // 0.09–0.12₽/1K — более мощные, но всё ещё в бюджете на 1–2 модели
+    // 0.09–0.12₽/1K — более мощные
     { id: 'deepseek/deepseek-v4-flash',      tier: 'mid',   coding: true,  vision: false, prompt: 0.036, completion: 0.072 },
     { id: 'deepseek/deepseek-v4-flash-thinking', tier: 'mid', coding: true, vision: false, prompt: 0.036, completion: 0.072 },
     { id: 'deepseek/deepseek-v4-flash-alt',   tier: 'mid',   coding: true,  vision: false, prompt: 0.04,  completion: 0.08  },
@@ -1422,7 +1422,7 @@
         if (bannedPrefixes.some(p => id.toLowerCase().startsWith(p))) return false;
         const p = parseFloat(m.pricing?.prompt || 0);
         const c = parseFloat(m.pricing?.completion || 0);
-        return p + c <= 0.25; // дешевле 0.25₽/1K
+        return p + c <= 0.25; // дешево
       })
       .map(m => {
         const id = m.id;
@@ -1464,7 +1464,7 @@
     return ((m.prompt || 0) * promptTokens + (m.completion || 0) * completionTokens) / 1000;
   }
 
-  // Подбирает 2–3 модели под бюджет. Сначала coding-модели, vision при необходимости.
+  // Подбирает 2–3 модели. Сначала coding-модели, vision при необходимости.
   function pickModelsUnderBudget(hasImage, budgetRub = BUDGET_RUB, minCount = 2, maxCount = 3) {
     const candidates = ORCHESTRATOR_MODELS.filter(m => isAvailableModel(m.id))
       .filter(m => hasImage ? m.vision : true)
@@ -1490,7 +1490,7 @@
   }
 
   // Вычисляет max_tokens для каждой модели в multi-режиме, чтобы общий completion-расход
-  // не превысил оставшийся бюджет. Предполагаем prompt фиксированным.
+  // не превысил лимит. Предполагаем prompt фиксированным.
   function allocateMaxTokens(modelIds, budgetRub = BUDGET_RUB, promptTokens = 1500) {
     const remaining = budgetRub - modelIds.reduce((sum, id) => sum + estimateCost(id, promptTokens, 0), 0);
     if (remaining <= 0) return modelIds.map(() => 256);
@@ -1529,13 +1529,13 @@
       '- Для быстрых/мелких задач — gpt-4.1-nano или gemini-2.5-flash-lite.',
       '- При нулевом балансе — perplexity/latest-large-online (0₽, GPT-4 class, веб-поиск) или perplexity/latest-small-online (0₽, быстрый).',
       '- Если задача содержит «[🎯 ЦЕЛЬ ОПЕРАЦИИ]» или «⌖ <tag>» — это указатель на конкретный файл. Игнорировать нельзя.',
-      '- ЖЁСТКИЙ БЮДЖЕТ: один запрос должен уложиться в 0.2₽. Для multi выбирай 2–3 модели так, чтобы сумма prompt+completion на ~1500 токенов не превысила 0.2₽.',
+      '- ',
       '',
       'ВАЖНО: платформа заточена под разработку современных веб-приложений (React, Next.js, лендинги, дашборды). По умолчанию delegate или multi. Direct — только для чистого Q&A без кода.',
       '',
       mode === 'multi'
-        ? 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 2–3 id (один с coding, один с vision если есть картинка). Сумма цен на 1500 prompt + 1500 completion ≤ 0.2₽.'
-        : 'Верни ОДИН JSON-объект: {"action":"delegate","model":"<id>"} — выбери самую дешёвую сильную модель с coding/vision под задачу (≤0.2₽ на 1500+1500 токенов).',
+        ? 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 2–3 id (один с coding, один с vision если есть картинка). '
+        : 'Верни ОДИН JSON-объект: {"action":"delegate","model":"<id>"} — выбери самую дешёвую сильную модель с coding/vision под задачу ().',
       '',
       'Без prose. Без тройных бэктиков. Без пояснений. Без "Мы видим, что...". Один JSON от первого до последнего символа.',
       '',
@@ -1739,7 +1739,7 @@
               const nr = await callOpenAI(m.id, slim);
               if (!nr.error) { fallbackId = m.id; fallbackResp = nr; break; }
               // Если slim тоже упирается в лимит → пробуем FULL delegateMessages
-              // (только если бюджетный экзек не повторяется дословно).
+              // (только если экзек не повторяется дословно).
               if (isBudgetOrModelError(nr.error)) continue;
             } catch (e) { /* keep walking */ }
           }
@@ -1770,20 +1770,20 @@
       // Vision-эскалация перед фильтром — иначе для картинок уйдёт запрос к модели без vision.
       if (hasImageAttachment) ids = ids.map(id => pickVision(id, false));
       ids = ids.filter(id => ORCHESTRATOR_MODELS.find(m => m.id === id)).slice(0, 3);
-      // Если router не выбрал или выбрал неподходящее — берём под бюджет автоматически.
+      // Если router не выбрал или выбрал неподходящее — берём автоматически.
       if (!ids.length) {
         ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
       }
-      // Проверяем, что выбранные модели укладываются в бюджет; если нет — пересобираем.
+      // Проверяем, что выбранные модели подходят; если нет — пересобираем.
       const estimatedCost = ids.reduce((sum, id) => sum + estimateCost(id, 1500, 1500), 0);
       if (estimatedCost > BUDGET_RUB) {
-        onStep && onStep('Router превысил бюджет 0.2₽ (' + estimatedCost.toFixed(2) + '₽) → пересобираю под бюджет');
+        onStep && onStep('Router выбрал неподходящие модели → пересобираю');
         ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
       }
-      // Распределяем max_tokens под бюджет. Для multi используем slim-контекст,
-      // иначе workspace-контекст раздувает запрос до 90K+ токенов и превышает 0.2₽.
+      // Распределяем max_tokens. Для multi используем slim-контекст,
+      // иначе workspace-контекст раздувает запрос до 90K+ токенов.
       const maxTokensList = allocateMaxTokens(ids, BUDGET_RUB, 1500);
-      onStep && onStep('Параллельный опрос ' + ids.length + ' моделей (бюджет ≤0.2₽, slim-контекст)…');
+      onStep && onStep('Параллельный опрос моделей…');
       const sleep = ms => new Promise(r => setTimeout(r, ms));
       const results = await Promise.all(ids.map(async (id, idx) => {
         // gpt-4.1-nano и другие лёгкие модели rate-limit: не более 1 запроса/сек.
@@ -1846,11 +1846,12 @@
       const blocks = ok.map(r => '### ' + r.id + '\n' + r.text).join('\n\n---\n\n');
       onStep && onStep('Синтез финального ответа…');
       let synth;
-      try { synth = await callOpenAI(routerModel, [
+      // Синтезатор должен быть лёгким — без полного workspace-контекста, иначе превысим лимит.
+      const synthMsgs = [
         { role: 'system', content: 'Синтезатор. ОБЯЗАТЕЛЬНО сохраняй все блоки кода с пометкой `// file: path`, `<!-- file: path -->` или подобные — КАК ЕСТЬ, не перефразируй и не теряй. Объедини лучшие части ответов в один точный ответ на русском. Не упоминай, что было несколько моделей.\n\n=== ТОН: REPLIT-AGENT ===\nПиши как инженер в Slack — не эссеист. Не более 2-4 предложений prose. Без вступлений: «Давайте», «Хорошо», «Сейчас я», «Я рассмотрю», «Мы должны», «Вот мой план», «Давайте начнём». Без объяснений очевидного. Без встречных вопросов в конце. Формат — что изменено одной строкой через запятую + одно предложение пояснения при необходимости.' },
-        ...ctx,
-        { role: 'user', content: userContentFor('Запрос:\n<<<\n' + content + '>>>\n\nОтветы:\n' + blocks, attachments, false) }
-      ]); }
+        { role: 'user', content: 'Запрос:\n<<<\n' + content + '>>>\n\nОтветы:\n' + blocks }
+      ];
+      try { synth = await callOpenAI(routerModel, synthMsgs); }
       catch (err) {
         onStep && onStep('Синтез упал: ' + err.message);
         return { text: ok[0].text, model: ok[0].id };
@@ -2036,6 +2037,7 @@
               }
               updateOrchestratorActiveModel(status);
               activityTracker.push(status);
+              scrollBottom();
             }, attachments, history);
             if (reply && reply.error) {
               // Показываем ошибку как содержимое пузыря — иначе выглядит как «пустой ответ».
@@ -2435,7 +2437,17 @@
     if (diff < 3600) return `${Math.floor(diff / 60)} мин назад`;
     return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   }
-  function scrollBottom() { requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }); }
+  function scrollBottom() {
+    const el = messagesEl;
+    if (!el) return;
+    const isNearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 120;
+    // Если пользователь не откроллил вверх — подтягиваем вниз (с задержкой, чтобы DOM успел обновиться).
+    if (isNearBottom) {
+      [0, 50, 150, 300].forEach(ms => setTimeout(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior: ms === 0 ? 'smooth' : 'auto' });
+      }, ms));
+    }
+  }
   function removeEmptyState() { messagesEl.querySelector('.empty-chat')?.remove(); }
   function autoResize() { inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
   function countModels() { return (window.WEBLLM_PRESETS && Object.keys(window.WEBLLM_PRESETS).length) || 0; }
