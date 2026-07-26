@@ -140,9 +140,22 @@
       openai: true,
     };
 
-    // ⭐ Gemini DIRECT — как я (Replit Agent): одна сильная модель, детальный промпт,
-    // без роутера, без multi. Запрос → Gemini → код → файлы → превью → чистый чат.
-    // Доступен только если есть GEMINI_API_KEY.
+    // ⭐ Groq DIRECT — бесплатно (Llama 3 70B), без квот, без карт.
+    // Приоритет выше Gemini, т.к. у Gemini кончилась квота.
+    if (config.hasGroq) {
+      modelPresets['groq-direct'] = {
+        name: '⚡ Groq Llama 3 70B Direct',
+        label: 'Groq Llama 3 70B Direct',
+        desc: 'Как Replit Agent. Бесплатно, без ограничений, Llama 3 70B',
+        color: 'pro',
+        featured: true,
+        openai: true,
+        apiModel: 'llama3-70b-8192',
+        directVision: false,
+      };
+    }
+
+    // ⭐ Gemini DIRECT — как Replit Agent, но через Google AI Studio.
     if (config.hasGemini) {
       modelPresets['gemini-direct'] = {
         name: '⚡ Gemini 2.5 Pro Direct',
@@ -156,10 +169,11 @@
       };
     }
 
-    // Устанавливаем Gemini Direct по умолчанию, если есть ключ Gemini.
-    // Иначе Мульти AI на Perplexity.
+    // Приоритет: Groq (работает) > Gemini (квота может быть) > Perplexity (0₽).
     if (!modelPresets[currentModel] || currentModel === DEFAULT_MODEL_KEY) {
-      currentModel = config.hasGemini ? 'gemini-direct' : 'perplexity-multi-router';
+      currentModel = config.hasGroq ? 'groq-direct'
+        : config.hasGemini ? 'gemini-direct'
+        : 'perplexity-multi-router';
     }
 
     renderModelDropdown();
@@ -1528,6 +1542,10 @@
     { id: 'gemini-2.0-flash',    provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.0 Flash',         desc: 'Google AI Studio ⸺ БЕСПЛАТНО 1500 запр/день, топ кодинг' },
     { id: 'gemini-2.5-flash',    provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.5 Flash',         desc: 'Google AI Studio ⸺ новейшая, мощнее Flash 2.0' },
     { id: 'gemini-2.5-pro',      provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.5 Pro',           desc: 'Google AI Studio ⸺ самая сильная, GPT-4 class' },
+    // Groq — бесплатный API (Llama 3 70B, Mixtral), OpenAI-совместимый
+    { id: 'llama3-70b-8192',     provider: 'groq', tier: 'premium', coding: true, vision: false, prompt: 0, completion: 0, name: '⚡ Groq Llama 3 70B',          desc: 'Groq ⸺ БЕСПЛАТНО, Llama 3 70B, очень быстрый' },
+    { id: 'llama-3.3-70b-specdec', provider: 'groq', tier: 'premium', coding: true, vision: false, prompt: 0, completion: 0, name: '⚡ Groq Llama 3.3 70B',       desc: 'Groq ⸺ Llama 3.3 70B specdec, быстрее и точнее' },
+    { id: 'mixtral-8x7b-32768',  provider: 'groq', tier: 'mid', coding: true, vision: false, prompt: 0, completion: 0, name: 'Groq Mixtral 8x7B',          desc: 'Groq ⸺ Mixtral 8x7B, экспертный микс' },
   ];
   // Активный ростер. Инициализируется baseline, потом обновляется через /api/models.
   let ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
@@ -1610,24 +1628,27 @@
     }
   }
 
+  function isFreeProvider(provider) { return provider === 'gemini' || provider === 'groq'; }
+
   function estimateCost(modelId, promptTokens, completionTokens) {
     const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
     if (!m) return Infinity;
-    // Gemini — бесплатно
-    if (m.provider === 'gemini') return 0;
+    if (isFreeProvider(m.provider)) return 0;
     return ((m.prompt || 0) * promptTokens + (m.completion || 0) * completionTokens) / 1000;
   }
 
-  // Подбирает 2–3 модели. Сначала Gemini (бесплатно), потом VseGPT под бюджет.
+  // Подбирает 2–3 модели. Сначала бесплатные (Groq, Gemini), потом VseGPT.
   function pickModelsUnderBudget(hasImage, budgetRub = BUDGET_RUB, minCount = 2, maxCount = 3) {
     const candidates = ORCHESTRATOR_MODELS.filter(m => isAvailableModel(m.id))
       .filter(m => hasImage ? m.vision : true)
       .filter(m => m.coding)
       .slice(); // копия
-    // Сортируем: Gemini (бесплатно) → самые сильные (дешёвые) VseGPT
+    // Сортируем: бесплатные (Groq, Gemini) → самые сильные (дешёвые) VseGPT
     candidates.sort((a, b) => {
-      if (a.provider === 'gemini' && b.provider !== 'gemini') return -1;
-      if (a.provider !== 'gemini' && b.provider === 'gemini') return 1;
+      const aFree = isFreeProvider(a.provider);
+      const bFree = isFreeProvider(b.provider);
+      if (aFree && !bFree) return -1;
+      if (!aFree && bFree) return 1;
       const aPrice = (a.prompt || 0) + (a.completion || 0);
       const bPrice = (b.prompt || 0) + (b.completion || 0);
       return aPrice - bPrice;
@@ -1655,7 +1676,7 @@
     // Gemini — бесплатно, ставим 4096 max_tokens без учёта бюджета
     return modelIds.map(id => {
       const m = ORCHESTRATOR_MODELS.find(x => x.id === id);
-      if (m?.provider === 'gemini') return 4096;
+      if (isFreeProvider(m?.provider)) return 4096;
       // VseGPT: распределяем бюджет пропорционально цене completion
       return 1024;
     });
@@ -1670,7 +1691,7 @@
   // Gemini-модели бесплатные — без ограничений.
   function capMaxTokens(modelId, budgetRub = BUDGET_RUB, promptTokens = 1500) {
     const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
-    if (m?.provider === 'gemini') return 4096;
+    if (isFreeProvider(m?.provider)) return 4096;
     if (!m || !m.completion) return 1024;
     const promptCost = (m.prompt * promptTokens) / 1000;
     const remaining = budgetRub - promptCost;
@@ -1689,7 +1710,7 @@
 
   function budgetedMaxTokens(modelId, messages, requested = 1024) {
     const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
-    if (m?.provider === 'gemini') return Math.min(4096, requested);
+    if (isFreeProvider(m?.provider)) return Math.min(4096, requested);
     if (!m || !m.completion) return Math.max(128, Math.min(512, requested));
     const promptTokens = estimatePromptTokens(messages);
     const promptCost = (m.prompt * promptTokens) / 1000;

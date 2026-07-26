@@ -462,14 +462,71 @@ app.get('/api/config', (req, res) => {
     llmModel,
     hasOpenAI: !!(process.env.OPENAI_API_KEY || process.env.VSEGPTRU),
     hasGemini: !!process.env.GEMINI_API_KEY,
+    hasGroq: !!process.env.GROQ_API_KEY,
     openaiBaseURL: process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru'
   });
 });
 
-// ── OpenAI-compatible API proxy (VseGPT, Gemini, OpenAI...) ─
+// ── OpenAI-compatible API proxy (VseGPT, Gemini, Groq, OpenAI...) ─
 app.post('/api/chat/openai', (req, res) => {
   const { messages, model, max_tokens, provider } = req.body;
   if (!messages) return res.status(400).json({ error: 'messages required' });
+
+  // Groq provider — бесплатно, Llama 3 70B / Mixtral, без ограничений
+  if (provider === 'groq') {
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) return res.status(400).json({ error: 'GROQ_API_KEY not configured. Get one at https://console.groq.com/keys' });
+
+    const url = new URL('https://api.groq.com/openai/v1/chat/completions');
+    const isStream = req.body.stream !== false;
+    const requestedMaxTokens = Number(max_tokens);
+    const safeMaxTokens = Number.isFinite(requestedMaxTokens) ? Math.max(128, Math.min(8192, Math.floor(requestedMaxTokens))) : 1024;
+
+    if (isStream) {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no'
+      });
+      res.flushHeaders();
+    }
+    const body = JSON.stringify({ model: model || 'llama3-70b-8192', messages, stream: !!isStream, max_tokens: safeMaxTokens });
+    const options = {
+      hostname: url.hostname, path: url.pathname, method: 'POST',
+      headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    };
+    const proxyReq = https.request(options, (proxyRes) => {
+      if (proxyRes.statusCode >= 400) {
+        let errBody = '';
+        proxyRes.on('data', (chunk) => { errBody += chunk; });
+        proxyRes.on('end', () => {
+          let msg = errBody;
+          try { const p = JSON.parse(errBody); msg = p.error?.message || p.error || errBody; } catch {}
+          if (isStream) { res.write(`data: ${JSON.stringify({ error: msg })}\n\n`); res.write('data: [DONE]\n\n'); }
+          else { res.json({ error: msg }); }
+          res.end();
+        });
+        return;
+      }
+      if (!isStream) {
+        let body = '';
+        proxyRes.on('data', (chunk) => { body += chunk; });
+        proxyRes.on('end', () => {
+          try { const j = JSON.parse(body); if (j.error) return res.json({ error: j.error.message || j.error }); res.json({ text: j.choices?.[0]?.message?.content || '', model: j.model || model }); }
+          catch (e) { res.json({ error: 'Failed to parse Groq response: ' + body.slice(0, 200) }); }
+        });
+        return;
+      }
+      proxyRes.on('data', (chunk) => { res.write(chunk); });
+      proxyRes.on('end', () => { res.end(); });
+    });
+    proxyReq.on('error', (err) => {
+      if (isStream) { res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`); res.write('data: [DONE]\n\n'); }
+      else { res.json({ error: err.message }); }
+      res.end();
+    });
+    proxyReq.write(body);
+    proxyReq.end();
+    return;
+  }
 
   // Gemini provider — использует Google AI Studio API (бесплатно, 1500 запр/день)
   if (provider === 'gemini') {
