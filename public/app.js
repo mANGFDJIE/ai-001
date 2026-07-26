@@ -2039,6 +2039,11 @@
                      || /\b(?:пожалуйста[, ]+(?:опишите|предоставьте|дайте|расскажите|уточните|пришлите|подскажите|поделитесь|дайте\s+знать|опишите\s+подробнее|опишите\s+что|уточните\s+что)|опишите\s+(?:что|как|какие)|расскажите\s+(?:про|о))[\s\S]{0,40}?\b(?:изображение|картинк|скриншот|макет|дизайн|страниц)\b/i;
     // Код-стаб: только <h1> + один-два элемента без фрейма/таблицы/формы — модель схитрила.
     const STUB_RE = /<html[\s\S]{0,800}<\/h1>\s*[\s\S]{0,400}<\/body>/i;
+
+    // Soft-limit VseGPT per-query: модель вернула текст ошибки (\`Exceeded soft user limit...\`,
+    // \`expected price ... but your limit is ...\`) вместо полезного ответа. Это не
+    // полезно для синтеза — forced-rerun с более дешёвой моделью или диагностика.
+    const SOFT_LIMIT_RE = /(Exceeded\s+(?:soft|user)\s+limit\s+per\s+query|expected\s+price\s+\d|your\s+limit\s+is\s+\d|лимит\s+(?:на|составляет)|Input\s+tokens?\s+\d+\s*[->]\s*\d+)/i;
     const isUsefulResponse = (t) => {
       const s = String(t || '').trim();
       if (s.length < 200) return false;
@@ -2047,6 +2052,7 @@
                        && !/```|<html|<!doctype|<svg|<\w+/i.test(s);
       if (onlyMarkers) return false;
       if (REFUSAL_RE.test(s)) return false;
+      if (SOFT_LIMIT_RE.test(s)) return false;
       const hasFence = /```/.test(s);
       if (!hasFence && TUTORIAL_RE.test(s)) return false;
       // Мета-вопрос без кода: «опишите изображение...» — модель попросила
@@ -2941,7 +2947,7 @@
       let dataUrl = rawDataUrl;
       let resized = false;
       if (isImage) {
-        const out = await downsampleImage(rawDataUrl, 1024, 0.78);
+        const out = await downsampleImage(rawDataUrl, 768, 0.62);
         if (out && out.length && out.length < rawDataUrl.length) {
           dataUrl = out; resized = true;
         }
