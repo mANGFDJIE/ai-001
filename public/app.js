@@ -146,9 +146,17 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
     }
     // Add OpenAI-compatible models (DeepSeek, OpenAI, OpenRouter…)
     if (config.hasOpenAI) {
-      // Авто и Мульти AI отключены: теперь только прямой выбор конкретной модели.
+      // ── Мульти AI — выбор 1–3 моделей для синтеза лучшего ответа (с бюджетным контролем).
+      modelPresets['multi'] = {
+        name: '⭐ Мульти AI', label: '⭐ Мульти AI', color: 'pro',
+        desc: 'Параллельно 1–3 модели + vision для скриншотов; синтез лучшего ответа',
+        openai: true,
+        apiModel: 'openai/gpt-4.1-nano',
+        router: 'multi',
+        featured: true
+      };
       // Default — google/gemini-2.5-flash-lite как надёжный и дешёвый кодер.
-      if (currentModel === 'auto' || currentModel === 'multi' || currentModel === 'orchestrator' || currentModel === 'openai-chat' || currentModel === 'deepseek-reasoner' || currentModel.startsWith('featured-')) {
+      if (currentModel === 'auto' || currentModel === 'orchestrator' || currentModel === 'openai-chat' || currentModel === 'deepseek-reasoner' || currentModel.startsWith('featured-')) {
         currentModel = 'direct:google/gemini-2.5-flash-lite';
       }
     }
@@ -1573,8 +1581,8 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
       'ВАЖНО: платформа заточена под разработку современных веб-приложений, лендингов, mini-app. По умолчанию delegate или multi. Direct — только для чистого Q&A без кода.',
       '',
       mode === 'auto'
-        ? 'Верни ОДИН JSON-объект: {"action":"direct"|"delegate", "answer":"...", "model":"<id>"}. Правила: direct — только для короткого Q&A без кода (поле answer). delegate — одна лучшая модель для задачи. Для кода/UI/лендингов/миниапсов — всегда delegate. Если есть картинка — выбери модель с меткой ·vision. Всё должно уложиться в 0.07₽ на запрос.'
-        : 'Верни ОДИН JSON-объект: {"action":"delegate", "model":"<id>"} — выбери одну модель (coding или vision если есть картинка). Бюджет: 0.07₽.',
+        ? 'Верни ОДИН JSON-объект: {"action":"direct"|"delegate"|"multi", "answer":"...", "model":"<id>", "models":["<id>","<id>"]}. Правила: direct — только для короткого Q&A без кода (поле answer). delegate — одна лучшая модель для задачи. multi — 1–3 модели для сложных/UI/лендингов/миниапсов. Если есть картинка — включи vision-модель. Всё должно уложиться в 0.07₽ на запрос.'
+        : 'Верни ОДИН JSON-объект: {"action":"multi","models":["<id>","<id>","<id>"]} — выбери 1–3 id (coding, и vision если есть картинка). Бюджет: 0.07₽ суммарно.',
       '',
       'Без prose. Без тройных бэктиков. Без пояснений. Без "Мы видим, что...". Один JSON от первого до последнего символа.',
       '',
@@ -1697,8 +1705,10 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
         { role: 'user', content: await userContentFor(content, attachments, supportsVision) }
       ];
     };
-    // Мульти AI отключён: теперь router выбирает одну лучшую модель под задачу.
-    // Это убирает параллельные запросы и позволяет уложиться в лимит 0.07₽.
+    // В режиме Мульти AI не нужен router — сразу запускаем подбор моделей.
+    if (mode === 'multi') {
+      return await runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel);
+    }
 
     onStep && onStep('Маршрутизация (gpt-4.1-nano)…');
     let routerResp = '';
@@ -1825,11 +1835,10 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
       return { text: r.text, model: id };
     }
     if (decision.action === 'multi') {
-      // Мульти-AI отключён: берём одну лучшую модель из router-списка и делегируем.
       let ids = Array.isArray(decision.models) ? decision.models : [];
       if (hasImageAttachment) ids = ids.map(id => pickVision(id, false));
-      decision.model = ids.find(id => ORCHESTRATOR_MODELS.find(m => m.id === id)) || (ORCHESTRATOR_MODELS.find(m => m.coding) || ORCHESTRATOR_MODELS[0]).id;
-      decision.action = 'delegate';
+      ids = ids.filter(id => ORCHESTRATOR_MODELS.find(m => m.id === id)).slice(0, 3);
+      return await runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel, ids);
     }
     return { text: '', error: 'Неизвестное действие: ' + decision.action, model: routerModel };
   }
@@ -1988,15 +1997,16 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
     let decoration = selectedPreset.name;
 
     try {
-      // Choose model: explicit preset, or auto-pick by task × complexity.
-      if (currentModel.startsWith('direct:')) {
+      // Choose model: explicit preset for direct models, or auto-pick WebLLM by task.
+      if (selectedPreset.openai && currentModel.startsWith('direct:')) {
+        modelId = selectedPreset.apiModel || currentModel.replace('direct:', '');
+        decoration = selectedPreset.name;
+        setActiveModel(modelId, selectedPreset.name);
+      } else {
         autoInfo = await llm.pickAuto(content);
         modelId = autoInfo.model_id;
         decoration = `Авто: ${autoInfo.label}`;
         setActiveModel(modelId, autoInfo.label);
-      } else {
-        modelId = (selectedPreset.model_id) || (window.WEBLLM_MODELS?.find((m) => m && m.key === currentModel) || {}).model_id || null;
-        setActiveModel(modelId, selectedPreset.name);
       }
 
       const labelEl = thinkEl.querySelector('.status-text');
@@ -2393,9 +2403,17 @@ const COMPACT_SYSTEM_PROMPT = 'You are a coding agent. Build plain HTML+CSS+JS o
     } else if (/Синтез/.test(status)) {
       label = 'Синтез'; badge = 'Router';
       sub = 'Сильные стороны: ' + (STRENGTHS['openai/gpt-4.1-nano'] || 'роутер, 1M контекст');
-    } else if (/Параллельный/i.test(status) || /часть моделей/i.test(status)) {
-      // Мульти-AI отключён; эти статусы больше не должны появляться.
-      return;
+    } else if (/Параллельный/i.test(status)) {
+      label = 'Мульти AI'; badge = 'Multi';
+      const ids = (status.match(/(\w+\/\w+(?:-\w+)*(?:-[\d.]+)?(?:-thinking-high)?)/g) || []).filter(x => STRENGTHS[x]).slice(0, 2);
+      if (ids.length) {
+        sub = 'Сильные стороны: ' + ids.map(x => STRENGTHS[x]).join(' / ');
+      } else {
+        sub = 'Несколько моделей работают параллельно';
+      }
+    } else if (/часть моделей/i.test(status)) {
+      label = 'Мульти AI'; badge = 'Multi';
+      sub = 'Сильные стороны: ' + (STRENGTHS['mistralai/devstral-small'] || 'код, UI, лендинги');
     } else {
       return;
     }

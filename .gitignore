@@ -4,5 +4,6 @@ node_modules/
 .local/
 screenshots/
 attached_assets/
+workspace/preview/attached/
 zipFile.zip
 .DS_Store
