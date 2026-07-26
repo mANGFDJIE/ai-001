@@ -107,10 +107,23 @@ Sync идёт через **серверный proxy** (`/api/sync/*` в `server.
 
 Фильтр **до** ранжирования: prompt+completion ≤ 0.06₽/1K (`BUDGET_RUB`-1¢ запас на retry), пропускаем embedding/img2/tts/embedding префиксы. Отбрасываем модели со score < 6. Курированный ростер сохраняется в `workspace/state/roster.json` с timestamp; клиент берёт свежий список через `GET /api/scout-models` без перезапуска сервера.
 
+### Claude-аналоги (vision+coder)
+
+Список закреплён на сервере (`CLAUDE_ANALOGS_FALLBACK` в `server.js`) — каждый модель покрывает тот же класс задач, что Claude: чтение скриншота → построение страницы 1:1, сложный UI/лендинг/TMA:
+
+- `anthropic/claude-3-5-sonnet-20241022`, `claude-3-5-sonnet-20240620`, `claude-3-haiku-20240307`
+- `openai/gpt-4o`, `openai/gpt-4o-mini`
+- `google/gemini-2.5-flash-pre`, `gemini-2.5-flash`
+- `mistralai/pixtral-12b-2409`, `qwen/qwen-2.5-vl-72b-instruct`, `meta-llama/llama-3.2-90b-vision-instruct`, `xai/grok-2-vision-1212`
+
+Аналоги **пинятся в финальный ростер всегда**, независимо от того, возвращает ли провайдер их в `/v1/models` в этом часу. Если id уже есть в катастрофе — он просто склеится с актуальной ценой; если нет — добавляется с заявленной ценой (≤0.06₽/1K).
+
 Endpoint:
-- `GET /api/scout-models` → `{ data: [{id, prompt, completion, vision, coding, score}], cached, refreshing, ageMs, model }`
+- `GET /api/scout-models` → `{ data, cached, refreshing, ageMs, model }`
 - Холодный кеш → `202 { refreshing: true }` и асинхронный прогрев.
-- Hourly cron на сервере (`setInterval(refreshScout, 60min)` — `.unref()`).
+- Hourly cron (`setInterval(refreshScout, 60min)` — `.unref()`).
 - Клиент: основной путь `/api/scout-models`; fallback `/api/models` (старый regex-heuristic) сохраняется на случай, если серверный scout ещё не прогрелся.
 
-Сценарий: «Хочу модель, которая читает картинку → делает страницу 1:1.» — vision-фильтр из топ-5 ростера. |
+Сценарий:
+- «Хочу дешёвую модель под каждую задачу» — топ ростера по score (score=9 → vision+coder одного класса с Claude).
+- «Хочу модель, которая читает картинку → делает страницу 1:1» — vision-фильтр из топ-5 ростера. |
