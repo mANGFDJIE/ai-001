@@ -461,7 +461,7 @@ app.get('/api/config', (req, res) => {
     hasLocalLLM: !!llmModel,
     llmModel,
     hasOpenAI: !!(process.env.OPENAI_API_KEY || process.env.VSEGPTRU),
-    openaiBaseURL: process.env.OPENAI_BASE_URL || 'https://api.deepseek.com'
+    openaiBaseURL: process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru'
   });
 });
 
@@ -473,7 +473,7 @@ app.post('/api/chat/openai', (req, res) => {
   const { messages, model, max_tokens } = req.body;
   if (!messages) return res.status(400).json({ error: 'messages required' });
 
-  const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.deepseek.com/v1').replace(/\/+$/, '');
+  const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');
   const url = new URL(baseURL + '/chat/completions');
 
   res.writeHead(200, {
@@ -534,7 +534,7 @@ app.get('/api/models', (req, res) => {
   const apiKey = process.env.OPENAI_API_KEY || process.env.VSEGPTRU;
   if (!apiKey) return res.status(400).json({ error: 'OPENAI_API_KEY/VSEGPTRU not configured' });
 
-  const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.deepseek.com/v1').replace(/\/+$/, '');
+  const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');
   const url = new URL(baseURL + '/models');
 
   const options = {
