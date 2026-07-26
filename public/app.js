@@ -119,9 +119,21 @@
     ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
     rebuildDirectModelPresets();
 
-    // Если текущая модель не из ростера — переключаем на дешёвую vision по умолчанию.
+    // ⭐ Режим Мульти AI — Perplexity Large (бесплатно, 0₽) анализирует задачу
+    // и делегирует выполнение 1–3 лучшим моделям из ростера под бюджет 0.07₽.
+    modelPresets['perplexity-multi-router'] = {
+      name: 'Perplexity Large (Free) · Мульти AI',
+      label: 'Perplexity Large · Мульти AI',
+      desc: 'Бесплатно (0₽/1K). Анализ → делегирование лучшим моделям',
+      color: 'pro',
+      featured: true,
+      router: 'multi',
+      openai: true,
+    };
+
+    // Если текущая модель не из ростера — переключаем на режим Мульти AI.
     if (!modelPresets[currentModel]) {
-      currentModel = DEFAULT_MODEL_KEY;
+      currentModel = 'perplexity-multi-router';
     }
 
     renderModelDropdown();
@@ -1666,14 +1678,14 @@
     return [
       'ЖЁСТКОЕ ПРАВИЛО: ответ должен состоять ИСКЛЮЧИТЕЛЬНО из одного валидного JSON. Никаких пояснений, размышлений, prose, Markdown-обёрток до или после JSON. Только JSON.',
       '',
-      'Ты лёгкий маршрутизатор (gpt-4.1-nano). Реши, что делать с запросом пользователя.',
+      'Ты ультра-умный маршрутизатор (perplexity/latest-large-online, бесплатно 0₽). Реши, что делать с запросом пользователя.',
       '',
       'Правила:',
       '- "direct" ТОЛЬКО для чистого Q&A без кода: приветствие, перевод одной фразы, математика в одно действие, общий факт. Поле answer содержит КРАТКИЙ ответ.',
       '- Любая задача про СОЗДАТЬ / ИЗМЕНИТЬ / УДАЛИТЬ / ОТЛАДИТЬ / ОБЪЯСНИТЬ код/UI/файл/страницу — ОБЯЗАТЕЛЬНО delegate или multi.',
       '- Если в задаче картинка (vision) — обязательно включи модель с меткой ·vision. Лучшие vision-варианты: vis-openai/gpt-5-nano, vis-meta-llama/llama-3.2-11b-vision-instruct.',
       '- Для веб-приложений/лендингов/mini-app — предпочитай mistralai/devstral-small, google/gemini-2.5-flash-pre, deepseek/deepseek-chat.',
-      '- Для быстрых/мелких задач — openai/gpt-4.1-nano, google/gemini-2.5-flash-lite или qwen/qwen3-14b.',
+      '- Для быстрых/мелких задач — google/gemini-2.5-flash-lite, amazon/nova-micro-v1 или qwen/qwen3-14b.',
       '- Для мощного кода — qwen/qwen3-32b, mistralai/devstral-small, meta-llama/llama-4-scout.',
       '- При нулевом балансе — perplexity/latest-large-online (0₽, GPT-4 class, веб-поиск) или perplexity/latest-small-online (0₽, быстрый).',
       '- Если задача содержит «[🎯 ЦЕЛЬ ОПЕРАЦИИ]» или «⌖ <tag>» — это указатель на конкретный файл. Игнорировать нельзя.',
@@ -1765,7 +1777,7 @@
     // Маршрутизатор: deepseek/deepseek-coder — НЕ тратит токены на скрытое «reasoning»
     // (deepseek-coder дешевле и без encrypted reasoning)
     // и не выдавал JSON). Проверено эмпирически через прямой curl.
-    const routerModel = 'openai/gpt-4.1-nano'; // 0.015₽/1K, 1M ctx, стабильный JSON
+    const routerModel = 'perplexity/latest-large-online'; // 0₽/1K, бесплатно, веб-поиск, ультра-умный анализ
     // Снимок проекта нужен только экспертам и синтезатору — роутер не должен
     // тратить токены на чужой код, его задача только классифицировать запрос.
     const ctx = await buildWorkspaceContextMessages();
@@ -1811,7 +1823,7 @@
       return await runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel);
     }
 
-    onStep && onStep('Маршрутизация (gpt-4.1-nano)…');
+    onStep && onStep('Маршрутизация (Perplexity Large, 0₽)…');
     let routerResp = '';
     let routerR;
     try {
@@ -1823,7 +1835,7 @@
       ], 512);
     } catch (err) {
       onStep && onStep('Маршрутизатор недоступен: ' + err.message);
-      return { text: '', error: 'Маршрутизатор gpt-4.1-nano: ' + err.message, model: routerModel };
+      return { text: '', error: 'Маршрутизатор Perplexity: ' + err.message, model: routerModel };
     }
     if (routerR.error) {
       onStep && onStep('Маршрутизатор: ' + routerR.error);
@@ -2590,7 +2602,7 @@
     const STRENGTHS = {
       'perplexity/latest-large-online':            '🆓 0₽ — GPT-4 класс, веб-поиск, 32K',
       'perplexity/latest-small-online':            '🆓 0₽ — быстрый, веб-поиск, 32K',
-      'openai/gpt-4.1-nano':                       '0.015₽/1K — роутер, structured JSON, 1M ctx',
+      'perplexity/latest-large-online':             '0₽/1K — ультра-умный роутер, веб-поиск, бесплатно',
       'vis-openai/gpt-5-nano':                     '0.015₽/1K — GPT-5 Nano + vision 👁, 400K ctx',
       'mistralai/devstral-small':                  '0.015₽/1K — кодер Mistral, tools, 128K',
       'google/gemini-2.5-flash-lite':              '0.015₽/1K — Google, structured, 1M ctx',
@@ -2624,10 +2636,10 @@
       sub = 'Сильные стороны: ' + (STRENGTHS[id] || 'мульти-задачи');
     } else if (/Маршрутизаци/.test(status)) {
       label = 'Маршрутизация'; badge = 'Router';
-      sub = 'Сильные стороны: ' + (STRENGTHS['openai/gpt-4.1-nano'] || 'роутер, 1M контекст');
+      sub = 'Сильные стороны: ' + (STRENGTHS['perplexity/latest-large-online'] || 'роутер, веб-поиск');
     } else if (/Синтез/.test(status)) {
       label = 'Синтез'; badge = 'Router';
-      sub = 'Сильные стороны: ' + (STRENGTHS['openai/gpt-4.1-nano'] || 'роутер, 1M контекст');
+      sub = 'Сильные стороны: ' + (STRENGTHS['perplexity/latest-large-online'] || 'роутер, веб-поиск');
     } else if (/часть моделей/i.test(status)) {
       label = 'Мульти AI'; badge = 'Multi';
       sub = 'Сильные стороны: ' + (STRENGTHS['mistralai/devstral-small'] || 'код, UI, лендинги');
