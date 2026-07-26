@@ -1125,6 +1125,7 @@
         <span class="status-text">Думаю…</span>
         ${modelName ? `<span class="model-tag">${modelName}</span>` : ''}
       </div>
+      <div class="acti-live" hidden></div>
       <div class="load-bar"><div class="load-bar-fill"></div></div>`;
     messagesEl.appendChild(div);
     scrollBottom();
@@ -2545,14 +2546,6 @@
     } else if (/Синтез/.test(status)) {
       label = 'Синтез'; badge = 'Router';
       sub = 'Сильные стороны: ' + (STRENGTHS['openai/gpt-4.1-nano'] || 'роутер, 1M контекст');
-    } else if (/Параллельный/i.test(status)) {
-      label = 'Мульти AI'; badge = 'Multi';
-      const ids = (status.match(/(\w+\/\w+(?:-\w+)*(?:-[\d.]+)?(?:-thinking-high)?)/g) || []).filter(x => STRENGTHS[x]).slice(0, 2);
-      if (ids.length) {
-        sub = 'Сильные стороны: ' + ids.map(x => STRENGTHS[x]).join(' / ');
-      } else {
-        sub = 'Несколько моделей работают параллельно';
-      }
     } else if (/часть моделей/i.test(status)) {
       label = 'Мульти AI'; badge = 'Multi';
       sub = 'Сильные стороны: ' + (STRENGTHS['mistralai/devstral-small'] || 'код, UI, лендинги');
