@@ -1,64 +1,46 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Услуги рядом</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Услуги рядом</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header>
-<h1>Услуги рядом</h1>
-<input type="search" id="search" placeholder="Поиск услуг...">
-</header>
-
-<main>
-<div class="card-grid">
-<div class="card" data-title="ремонт квартир">
-<img src="https://source.unsplash.com/featured/?interior" alt="Ремонт квартир">
-<div class="card-info">
-<h2>Ремонт квартир</h2>
-<p class="tags">Отделка • Плитка • Краска</p>
-<p class="price">от 5 000 ₽</p>
-</div>
-</div>
-<div class="card" data-title="уборка дома">
-<img src="https://source.unsplash.com/featured/?cleaning" alt="Уборка дома">
-<div class="card-info">
-<h2>Уборка дома</h2>
-<p class="tags">Мойка • Пылесос • Уборка кухни</p>
-<p class="price">от 3 000 ₽</p>
-</div>
-</div>
-<div class="card" data-title="доставка еды">
-<img src="https://source.unsplash.com/featured/?delivery" alt="Доставка еды">
-<div class="card-info">
-<h2>Доставка еды</h2>
-<p class="tags">Быстрая • Питание • Ланч</p>
-<p class="price">от 1 500 ₽</p>
-</div>
-</div>
-<div class="card" data-title="перевозка грузов">
-<img src="https://source.unsplash.com/featured/?transport" alt="Перевозка грузов">
-<div class="card-info">
-<h2>Перевозка грузов</h2>
-<p class="tags">Междугородняя • Транспорт • Экспресс</p>
-<p class="price">от 8 000 ₽</p>
-</div>
-</div>
-</div>
-</main>
-
-<div id="modal" class="modal hidden">
-<div class="modal-content">
-<span id="close-modal" class="close">&times;</span>
-<img id="modal-img" src="" alt="">
-<h2 id="modal-title"></h2>
-<p id="modal-tags"></p>
-<p id="modal-price"></p>
-</div>
-</div>
-
-<script src="script.js"></script>
+  <header>
+    <h1>Услуги рядом</h1>
+    <nav>
+      <ul>
+        <li><a href="#">홈</a></li>
+        <li><a href="#">Услуги</a></li>
+        <li><a href="#">Мастера</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main>
+    <section class="services">
+      <h2>Popular Services</h2>
+      <!-- Herramientas dinámicas: Script.js generará las tarjetas de servicios -->
+      <script type="module" src="script.js"></script>
+    </section>
+    <section class="search">
+      <h2>ナ collegamento을 찾으세요</h2>
+      <form>
+        <input type="text" placeholder="Search...">
+        <button>검색</button>
+      </form>
+    </section>
+    <section class="about">
+      <h2>우리의 서비스</h2>
+      <p>
+        "Услуги рядом" это мини-приложение Telegram, برای finding nearby services quickly and easily. Find masters for
+        various tasks, like repairs, cleaning, delivery, and more.
+      </p>
+      <button>روابط 이동하기</button>
+    </section>
+    <footer>
+      <p>&copy; 2023 Услуги рядом. All rights reserved.</p>
+    </footer>
+  </main>
 </body>
 </html>

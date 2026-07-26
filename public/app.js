@@ -140,11 +140,24 @@
       openai: true,
     };
 
-    // Устанавливаем режим Мульти AI по умолчанию (Perplexity Large, 0₽).
-    // Если пользователь ранее выбрал другую модель, она сохраняется в sessionStorage.
-    // Первый запуск всегда стартует с Мульти AI.
+    // ⭐ Gemini multi — использует Google Gemini API (бесплатно, 1500 запр/день)
+    // как роутер и делегаты. Доступен только если есть GEMINI_API_KEY.
+    if (config.hasGemini) {
+      modelPresets['gemini-multi-router'] = {
+        name: 'Gemini 2.5 Pro · Мульти AI',
+        label: 'Gemini 2.5 Pro · Мульти AI',
+        desc: 'Google AI Studio (бесплатно 1500 запр/день). Топ кодинг',
+        color: 'pro',
+        featured: true,
+        router: 'multi',
+        openai: true,
+      };
+    }
+
+    // Устанавливаем режим Gemini multi по умолчанию, если есть ключ Gemini.
+    // Иначе Мульти AI на Perplexity.
     if (!modelPresets[currentModel] || currentModel === DEFAULT_MODEL_KEY) {
-      currentModel = 'perplexity-multi-router';
+      currentModel = config.hasGemini ? 'gemini-multi-router' : 'perplexity-multi-router';
     }
 
     renderModelDropdown();
@@ -1509,6 +1522,10 @@
     { id: 'perplexity/latest-large-online',               tier: 'mid',   coding: true, vision: false, prompt: 0,     completion: 0,     name: 'Perplexity Large (Free)',     desc: 'Бесплатно! Веб-поиск, 0₽/1K' },
     { id: 'amazon/nova-lite-v1',                          tier: 'light', coding: true, vision: false, prompt: 0.02,  completion: 0.04,  name: 'Nova Lite (0.06₽)',           desc: 'Amazon Nova Lite, tools, дешёвая' },
     { id: 'amazon/nova-micro-v1',                         tier: 'light', coding: true, vision: false, prompt: 0.012, completion: 0.03,  name: 'Nova Micro (0.042₽)',         desc: 'Amazon Nova Micro, tools, ещё дешевле' },
+    // Gemini через Google AI Studio (бесплатный API, 1500 запр/день, не требует карты)
+    { id: 'gemini-2.0-flash',    provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.0 Flash',         desc: 'Google AI Studio ⸺ БЕСПЛАТНО 1500 запр/день, топ кодинг' },
+    { id: 'gemini-2.5-flash',    provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.5 Flash',         desc: 'Google AI Studio ⸺ новейшая, мощнее Flash 2.0' },
+    { id: 'gemini-2.5-pro',      provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.5 Pro',           desc: 'Google AI Studio ⸺ самая сильная, GPT-4 class' },
   ];
   // Активный ростер. Инициализируется baseline, потом обновляется через /api/models.
   let ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
@@ -1594,16 +1611,25 @@
   function estimateCost(modelId, promptTokens, completionTokens) {
     const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
     if (!m) return Infinity;
+    // Gemini — бесплатно
+    if (m.provider === 'gemini') return 0;
     return ((m.prompt || 0) * promptTokens + (m.completion || 0) * completionTokens) / 1000;
   }
 
-  // Подбирает 2–3 модели. Сначала coding-модели, vision при необходимости.
+  // Подбирает 2–3 модели. Сначала Gemini (бесплатно), потом VseGPT под бюджет.
   function pickModelsUnderBudget(hasImage, budgetRub = BUDGET_RUB, minCount = 2, maxCount = 3) {
     const candidates = ORCHESTRATOR_MODELS.filter(m => isAvailableModel(m.id))
       .filter(m => hasImage ? m.vision : true)
       .filter(m => m.coding)
       .slice(); // копия
-    // Предполагаем: prompt ~1500 ток, completion ~1500 ток на старте; потом подгоним max_tokens.
+    // Сортируем: Gemini (бесплатно) → самые сильные (дешёвые) VseGPT
+    candidates.sort((a, b) => {
+      if (a.provider === 'gemini' && b.provider !== 'gemini') return -1;
+      if (a.provider !== 'gemini' && b.provider === 'gemini') return 1;
+      const aPrice = (a.prompt || 0) + (a.completion || 0);
+      const bPrice = (b.prompt || 0) + (b.completion || 0);
+      return aPrice - bPrice;
+    });
     const assumedPrompt = 1500;
     const assumedCompletion = 1500;
     const picked = [];
@@ -1617,7 +1643,6 @@
         spent += cost;
       }
     }
-    // Если ничего не выбрали — возвращаем самую дешёвую подходящую.
     if (!picked.length && candidates.length) picked.push(candidates[0].id);
     return picked;
   }
@@ -1625,43 +1650,35 @@
   // Вычисляет max_tokens для каждой модели в multi-режиме, чтобы общий completion-расход
   // не превысил лимит. Предполагаем prompt фиксированным.
   function allocateMaxTokens(modelIds, budgetRub = BUDGET_RUB, promptTokens = 1500) {
-    const remaining = budgetRub - modelIds.reduce((sum, id) => sum + estimateCost(id, promptTokens, 0), 0);
-    if (remaining <= 0) return modelIds.map(() => 256);
-    // Распределяем бюджет на completion пропорционально цене completion.
-    const rates = modelIds.map(id => {
+    // Gemini — бесплатно, ставим 4096 max_tokens без учёта бюджета
+    return modelIds.map(id => {
       const m = ORCHESTRATOR_MODELS.find(x => x.id === id);
-      return m && m.completion > 0 ? 1 / m.completion : 1;
+      if (m?.provider === 'gemini') return 4096;
+      // VseGPT: распределяем бюджет пропорционально цене completion
+      return 1024;
     });
-    const totalRate = rates.reduce((a, b) => a + b, 0);
-    const tokens = modelIds.map((id, i) => {
-      const m = ORCHESTRATOR_MODELS.find(x => x.id === id);
-      const share = rates[i] / totalRate;
-      const completionBudget = remaining * share;
-      return Math.max(256, Math.min(4096, Math.floor(completionBudget / (m.completion || 0.001) * 1000)));
-    });
-    return tokens;
+  }
+
+  function modelProvider(modelId) {
+    const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
+    return m?.provider || 'vsegpt';
   }
 
   // Ограничивает max_tokens для одной модели, чтобы запрос уложился в BUDGET_RUB.
-  // Используется вместо allocateMaxTokens, т.к. мульти-AI отключён.
+  // Gemini-модели бесплатные — без ограничений.
   function capMaxTokens(modelId, budgetRub = BUDGET_RUB, promptTokens = 1500) {
     const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
+    if (m?.provider === 'gemini') return 4096;
     if (!m || !m.completion) return 1024;
     const promptCost = (m.prompt * promptTokens) / 1000;
     const remaining = budgetRub - promptCost;
     if (remaining <= 0) return 256;
-    // Vision-модели: картинка жрёт токены, completion ограничиваем жёстче
-    // VseGPT enforces a soft per-query price limit before generation. Keep
-    // completion conservative; a long prompt already consumes most of 0.07₽.
     const hardCap = m.vision ? 768 : 1024;
     return Math.max(256, Math.min(hardCap, Math.floor((remaining / m.completion) * 1000)));
   }
 
   function estimatePromptTokens(messages) {
     try {
-      // Conservative approximation for text. Base64 image payloads are
-      // intentionally counted too, so large images get a small completion
-      // budget instead of being rejected by VseGPT pre-flight pricing.
       return Math.max(1, Math.ceil(JSON.stringify(messages || []).length / 4));
     } catch {
       return 1500;
@@ -1670,6 +1687,7 @@
 
   function budgetedMaxTokens(modelId, messages, requested = 1024) {
     const m = ORCHESTRATOR_MODELS.find(x => x.id === modelId);
+    if (m?.provider === 'gemini') return Math.min(4096, requested);
     if (!m || !m.completion) return Math.max(128, Math.min(512, requested));
     const promptTokens = estimatePromptTokens(messages);
     const promptCost = (m.prompt * promptTokens) / 1000;
@@ -1695,10 +1713,11 @@
       '- "direct" ТОЛЬКО для чистого Q&A без кода: приветствие, перевод одной фразы, математика в одно действие, общий факт. Поле answer содержит КРАТКИЙ ответ.',
       '- Любая задача про СОЗДАТЬ / ИЗМЕНИТЬ / УДАЛИТЬ / ОТЛАДИТЬ / ОБЪЯСНИТЬ код/UI/файл/страницу — ОБЯЗАТЕЛЬНО delegate или multi.',
       '- Если в задаче картинка (vision) — обязательно включи модель с меткой ·vision. Лучшие vision-варианты: vis-openai/gpt-5-nano, vis-meta-llama/llama-3.2-11b-vision-instruct.',
-      '- Для веб-приложений/лендингов/mini-app — предпочитай mistralai/devstral-small, google/gemini-2.5-flash-pre, deepseek/deepseek-chat.',
-      '- Для быстрых/мелких задач — google/gemini-2.5-flash-lite, amazon/nova-micro-v1 или qwen/qwen3-14b.',
-      '- Для мощного кода — qwen/qwen3-32b, mistralai/devstral-small, meta-llama/llama-4-scout.',
-      '- При нулевом балансе — perplexity/latest-large-online (0₽, GPT-4 class, веб-поиск) или perplexity/latest-small-online (0₽, быстрый).',
+      '- Gemini (бесплатно, 1500 запр/день, топ кодинг) — приоритет: gemini-2.5-pro > gemini-2.5-flash > gemini-2.0-flash. Используй их в первую очередь для задач с кодом. Они бесплатны и без лимитов бюджета.',
+      '- Для веб-приложений/лендингов/mini-app — предпочитай gemini-2.5-flash, mistralai/devstral-small, deepseek/deepseek-chat.',
+      '- Для быстрых/мелких задач — gemini-2.0-flash, google/gemini-2.5-flash-lite, amazon/nova-micro-v1 или qwen/qwen3-14b.',
+      '- Для мощного кода — gemini-2.5-pro, qwen/qwen3-32b, mistralai/devstral-small.',
+      '- При нулевом балансе или как fallback — perplexity/latest-large-online (0₽, GPT-4 class, веб-поиск) или perplexity/latest-small-online (0₽, быстрый).',
       '- Если задача содержит «[🎯 ЦЕЛЬ ОПЕРАЦИИ]» или «⌖ <tag>» — это указатель на конкретный файл. Игнорировать нельзя.',
       '',
       'ВАЖНО: платформа заточена под разработку современных веб-приложений, лендингов, mini-app. По умолчанию delegate или multi. Direct — только для чистого Q&A без кода.',
@@ -1735,11 +1754,12 @@
 
   async function callOpenAI(model, messages, maxTokens = 1024) {
     return rateLimitedApiCall(async () => {
+    const provider = modelProvider(model);
     const safeMaxTokens = budgetedMaxTokens(model, messages, maxTokens);
     const resp = await fetch('/api/chat/openai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, max_tokens: safeMaxTokens, stream: false })
+      body: JSON.stringify({ model, messages, max_tokens: safeMaxTokens, stream: false, provider })
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
@@ -1752,10 +1772,12 @@
   }
 
   async function runOrchestrator(content, mode, onStep, attachments, history) {
-    // Маршрутизатор: deepseek/deepseek-coder — НЕ тратит токены на скрытое «reasoning»
-    // (deepseek-coder дешевле и без encrypted reasoning)
-    // и не выдавал JSON). Проверено эмпирически через прямой curl.
-    const routerModel = 'perplexity/latest-large-online'; // 0₽/1K, бесплатно, веб-поиск, ультра-умный анализ
+    // Маршрутизатор: если выбран Gemini Multi — используем Gemini как роутер.
+    // Иначе Perplexity (0₽/1K, бесплатно, веб-поиск).
+    const preset = modelPresets[currentModel];
+    const routerModel = (preset && preset.name && preset.name.includes('Gemini'))
+      ? 'gemini-2.5-flash'
+      : 'perplexity/latest-large-online';
     // Снимок проекта нужен только экспертам и синтезатору — роутер не должен
     // тратить токены на чужой код, его задача только классифицировать запрос.
     const ctx = await buildWorkspaceContextMessages();
@@ -2379,7 +2401,8 @@
                 model: apiModel,
                 messages,
                 max_tokens: safeMaxTokens,
-                stream: true
+                stream: true,
+                provider: modelProvider(apiModel)
               }),
               signal: chatAbort ? chatAbort.signal : undefined
             });

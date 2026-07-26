@@ -461,17 +461,109 @@ app.get('/api/config', (req, res) => {
     hasLocalLLM: !!llmModel,
     llmModel,
     hasOpenAI: !!(process.env.OPENAI_API_KEY || process.env.VSEGPTRU),
+    hasGemini: !!process.env.GEMINI_API_KEY,
     openaiBaseURL: process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru'
   });
 });
 
-// ── OpenAI-compatible API proxy (DeepSeek, OpenAI, OpenRouter...) ─
+// ── OpenAI-compatible API proxy (VseGPT, Gemini, OpenAI...) ─
 app.post('/api/chat/openai', (req, res) => {
+  const { messages, model, max_tokens, provider } = req.body;
+  if (!messages) return res.status(400).json({ error: 'messages required' });
+
+  // Gemini provider — использует Google AI Studio API (бесплатно, 1500 запр/день)
+  if (provider === 'gemini') {
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' });
+
+    const requestedMaxTokens = Number(max_tokens);
+    const safeMaxTokens = Number.isFinite(requestedMaxTokens)
+      ? Math.max(128, Math.min(4096, Math.floor(requestedMaxTokens)))
+      : 512;
+
+    const url = new URL('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+    url.searchParams.set('key', geminiKey);
+
+    const isStream = req.body.stream === true;
+    if (isStream) {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no'
+      });
+      res.flushHeaders();
+    }
+
+    const body = JSON.stringify({
+      model: model || 'gemini-2.0-flash',
+      messages,
+      stream: !!isStream,
+      max_tokens: safeMaxTokens
+    });
+
+    const options = {
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    };
+
+    const proxyReq = https.request(options, (proxyRes) => {
+      if (proxyRes.statusCode >= 400) {
+        let errBody = '';
+        proxyRes.on('data', (chunk) => { errBody += chunk; });
+        proxyRes.on('end', () => {
+          let msg = errBody;
+          try { msg = JSON.parse(errBody).error?.message || errBody; } catch {}
+          if (isStream) {
+            res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+            res.write('data: [DONE]\n\n');
+          } else {
+            res.json({ error: msg });
+          }
+          res.end();
+        });
+        return;
+      }
+      if (!isStream) {
+        let body = '';
+        proxyRes.on('data', (chunk) => { body += chunk; });
+        proxyRes.on('end', () => {
+          try {
+            const json = JSON.parse(body);
+            if (json.error) return res.json({ error: json.error.message || json.error });
+            const text = json.choices?.[0]?.message?.content || '';
+            res.json({ text, model: json.model || model });
+          } catch (e) {
+            res.json({ error: 'Failed to parse Gemini response: ' + body.slice(0, 200) });
+          }
+        });
+        return;
+      }
+      proxyRes.on('data', (chunk) => { res.write(chunk); });
+      proxyRes.on('end', () => { res.end(); });
+    });
+    proxyReq.on('error', (err) => {
+      if (isStream) { res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`); res.write('data: [DONE]\n\n'); }
+      else { res.json({ error: err.message }); }
+      res.end();
+    });
+    proxyReq.write(body);
+    proxyReq.end();
+    return;
+  }
+
   const apiKey = process.env.OPENAI_API_KEY || process.env.VSEGPTRU;
   if (!apiKey) return res.status(400).json({ error: 'OPENAI_API_KEY/VSEGPTRU not configured' });
 
-  const { messages, model, max_tokens } = req.body;
-  if (!messages) return res.status(400).json({ error: 'messages required' });
+  const requestedMaxTokens = Number(max_tokens);
+  const safeMaxTokens = Number.isFinite(requestedMaxTokens)
+    ? Math.max(128, Math.min(1536, Math.floor(requestedMaxTokens)))
+    : 512;
   // VseGPT performs a pre-flight soft-limit check using the requested
   // completion size. Never let an omitted or stale client value turn into
   // an 8K-token request that is rejected before streaming starts.
