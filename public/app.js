@@ -2027,11 +2027,24 @@
         modelId = selectedPreset.apiModel || currentModel.replace('direct:', '');
         decoration = selectedPreset.name;
         setActiveModel(modelId, selectedPreset.name);
+      } else if (selectedPreset.openai || selectedPreset.local || selectedPreset.router) {
+        // API-оркестратор / local backend / preset-router — реальная модель
+        // выбирается ниже (runOrchestrator или /api/chat/local). Здесь только
+        // создаём заглушку, чтобы блок WebLLM auto-pick ниже не пытался
+        // взять модель из пустого MODELS (= []) и не падал с
+        // "Cannot read properties of undefined (reading 'key')".
+        modelId = currentModel;
+        decoration = selectedPreset.name;
       } else {
-        autoInfo = await llm.pickAuto(content);
-        modelId = autoInfo.model_id;
-        decoration = `Авто: ${autoInfo.label}`;
-        setActiveModel(modelId, autoInfo.label);
+        autoInfo = (typeof llm.pickAuto === 'function') ? await llm.pickAuto(content) : null;
+        if (autoInfo) {
+          modelId = autoInfo.model_id;
+          decoration = `Авто: ${autoInfo.label}`;
+          setActiveModel(modelId, autoInfo.label);
+        } else {
+          modelId = 'webllm-default';
+          decoration = 'WebLLM (локально)';
+        }
       }
 
       const labelEl = thinkEl.querySelector('.status-text');

@@ -780,5 +780,9 @@ function defaultIndexHtml() {
 }
 
 app.listen(PORT, '0.0.0.0', () => {
+  const hasOpenAI = !!(process.env.OPENAI_API_KEY || process.env.VSEGPTRU);
+  const openaiBaseURL = (process.env.OPENAI_BASE_URL || 'https://api.vsegpt.ru/v1').replace(/\/+$/, '');
+  const provider = openaiBaseURL.includes('vsegpt.ru') ? 'vsegpt.ru' : openaiBaseURL;
   console.log(`Сервер запущен на порту ${PORT}`);
+  console.log(`[openai] provider=${provider} key=${hasOpenAI ? 'set' : 'missing'} default_model=deepseek-chat`);
 });

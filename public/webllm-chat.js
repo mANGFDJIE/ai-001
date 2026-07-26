@@ -99,8 +99,8 @@ class WebLLMClient {
 
   async pickAuto(content) {
     const vram = await this.detectVRAM();
-    const m = pickModelForRequest(content, vram);
-    this.lastRouting = { task: classifyTask(content), complexity: classifyComplexity(content), chosen: m.key, vram };
+    const m = pickModelForRequest(content, vram) || { key: 'auto', model_id: 'auto', label: 'Auto', vram };
+    this.lastRouting = { task: classifyTask(content), complexity: classifyComplexity(content), chosen: m.key, vram: m.vram || vram };
     return m;
   }
 
