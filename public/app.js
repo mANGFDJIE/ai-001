@@ -1946,10 +1946,11 @@
     }
     const rawBlocks = ok.map(r => '### ' + r.id + '\n' + r.text).join('\n\n---\n\n');
     // VseGPT делает soft pre-flight по (prompt + max_completion). Урезаем блоки
-    // до бюджета (≈6K символов ≈ 1.5K токенов), чтобы синтез не упёрся в
-    // лимит 0.07₽/запрос. Первый ответ модели обычно содержит самое важное;
-    // при урезании оставляем именно его.
-    const MAX_BLOCK_CHARS = 6000;
+    // агрессивнее (≈1.8K символов ≈ 450 токенов), потому что gpt-4.1-nano
+    // берёт ~0.015₽/1K prompt — даже урезанные блоки плюс system-prompt уже
+    // приближаются к лимиту 0.07₽. Первый ответ модели обычно содержит самое
+    // важное; при урезании оставляем именно его.
+    const MAX_BLOCK_CHARS = 1800;
     const blocks = rawBlocks.length > MAX_BLOCK_CHARS
       ? rawBlocks.slice(0, MAX_BLOCK_CHARS) + '\n\n[… урезано для бюджета …]'
       : rawBlocks;
@@ -1959,7 +1960,10 @@
       { role: 'system', content: 'Синтезатор. ОБЯЗАТЕЛЬНО сохраняй все блоки кода с пометкой `// file: path`, `<!-- file: path -->` или подобные — КАК ЕСТЬ, не перефразируй и не теряй. Объедини лучшие части ответов в один точный ответ на русском. Не упоминай, что было несколько моделей.\n\n=== ТОН: REPLIT-AGENT ===\nПиши как инженер в Slack — не эссеист. Не более 2-4 предложений prose. Без вступлений: «Давайте», «Хорошо», «Сейчас я», «Я рассмотрю», «Мы должны», «Вот мой план», «Давайте начнём». Без объяснений очевидного. Без встречных вопросов в конце. Формат — что изменено одной строкой через запятую + одно предложение пояснения при необходимости.' },
       { role: 'user', content: 'Запрос:\n<<<\n' + content + '>>>\n\nОтветы:\n' + blocks }
     ];
-    try { synth = await callOpenAI(routerModel, synthMsgs, capMaxTokens(routerModel)); }
+    // budgetedMaxTokens учитывает РЕАЛЬНЫЙ размер сообщений и сужает
+    // max_completion так, чтобы (prompt + max) уложились в 0.07₽.
+    const synthMax = budgetedMaxTokens(routerModel, synthMsgs, 512);
+    try { synth = await callOpenAI(routerModel, synthMsgs, synthMax); }
     catch (err) {
       onStep && onStep('Синтез упал: ' + err.message);
       return { text: ok[0].text, model: ok[0].id };
