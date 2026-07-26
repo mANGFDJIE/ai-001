@@ -1637,6 +1637,12 @@
         { role: 'user', content: await userContentFor(content, attachments, supportsVision) }
       ];
     };
+    // В режиме Мульти-агент не нужен router — сразу запускаем параллельный опрос.
+    // Это экономит кредиты и исключает утечку JSON-ответа router в чат.
+    if (mode === 'multi') {
+      return await runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel);
+    }
+
     onStep && onStep('Маршрутизация (gpt-4.1-nano)…');
     let routerResp = '';
     let routerR;
@@ -1661,10 +1667,6 @@
       const m = routerResp.match(/\{[\s\S]*?\}/);
       decision = JSON.parse(m ? m[0] : routerResp);
     } catch {}
-    // В режиме Мульти-агент всегда форсируем multi, даже если router вернул delegate/direct.
-    if (mode === 'multi' && decision.action !== 'multi') {
-      decision = { action: 'multi', models: [] };
-    }
     if (decision.action === 'direct') {
       const directText = (decision.answer && decision.answer.trim()) || routerResp || '';
       // Если задача явно про код, а ответ маршрутизатора — verbose prose
@@ -1765,104 +1767,89 @@
       }
       return { text: r.text, model: id };
     }
-    if (decision.action === 'multi') {
-      let ids = Array.isArray(decision.models) ? decision.models : [];
-      // Vision-эскалация перед фильтром — иначе для картинок уйдёт запрос к модели без vision.
-      if (hasImageAttachment) ids = ids.map(id => pickVision(id, false));
-      ids = ids.filter(id => ORCHESTRATOR_MODELS.find(m => m.id === id)).slice(0, 3);
-      // Если router не выбрал или выбрал неподходящее — берём автоматически.
-      if (!ids.length) {
-        ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
-      }
-      // Проверяем, что выбранные модели подходят; если нет — пересобираем.
-      const estimatedCost = ids.reduce((sum, id) => sum + estimateCost(id, 1500, 1500), 0);
-      if (estimatedCost > BUDGET_RUB) {
-        onStep && onStep('Router выбрал неподходящие модели → пересобираю');
-        ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
-      }
-      // Распределяем max_tokens. Для multi используем slim-контекст,
-      // иначе workspace-контекст раздувает запрос до 90K+ токенов.
-      const maxTokensList = allocateMaxTokens(ids, BUDGET_RUB, 1500);
-      onStep && onStep('Параллельный опрос моделей…');
-      const sleep = ms => new Promise(r => setTimeout(r, ms));
-      const results = await Promise.all(ids.map(async (id, idx) => {
-        // gpt-4.1-nano и другие лёгкие модели rate-limit: не более 1 запроса/сек.
-        await sleep(idx * 1200);
-        try {
-          const supportsVision = !!ORCHESTRATOR_MODELS.find(m => m.id === id)?.vision;
-          const msgs = await slimDelegateMessages(id, supportsVision, content, attachments);
-          const r = await callOpenAI(id, msgs, maxTokensList[idx]);
-          if (r.error) return { id, error: r.error };
-          return { id, text: r.text };
-        } catch (err) {
-          return { id, error: err.message };
-        }
-      }));
-      const ok = results.filter(r => r.text && !r.error);
-      const failed = results.filter(r => r.error);
-      if (failed.length) {
-        failed.forEach(f => { if (isBudgetOrModelError(f.error)) markUnavailable(f.id); });
-        onStep && onStep('Часть моделей вернула ошибку: ' + failed.map(f => f.id + ' (' + f.error + ')').join(', '));
-      }
-      if (!ok.length) {
-        return { text: '', error: 'Все модели в multi-опросе упали: ' + failed.map(f => f.id + ' [' + f.error + ']').join('; '), model: ids.join(',') };
-      }
-      // Записываем файлы из каждого экспертного ответа ещё ДО синтеза,
-      // потому что синтезатор может переписать и потерять маркеры `// file:`.
-      try {
-        const allChanges = [];
-        for (const r of ok) {
-          const ch = extractCodeChanges(r.text);
-          if (ch.length) {
-            onStep && onStep('Записываю файлы из ' + r.id + ': ' + ch.map(c => c.path).join(', '));
-            allChanges.push(...ch);
-          }
-        }
-        if (allChanges.length) await applyCodeChanges(allChanges);
-        // Retry-once: задача про код, но ни один эксперт не выдал маркеров файла.
-        // Шлём одну повторную попытку самой сильной coding/vision-модели с жёстким требованием.
-        if (looksLikeCodeTask(content) && !allChanges.length) {
-          onStep && onStep('Ни один эксперт не выдал код — повтор одной сильной модели с требованием…');
-          const forced = ORCHESTRATOR_MODELS.find(m => m.coding && m.vision) || ORCHESTRATOR_MODELS.find(m => m.coding) || ORCHESTRATOR_MODELS[0];
-          try {
-            const fr = await callOpenAI(forced.id, [
-              ...(await delegateMessages(forced.id)),
-              { role: 'user', content: 'ПРЕДЫДУЩИЕ ОТВЕТЫ НЕ СОДЕРЖАЛИ КОДА. Повтори ответ строго в формате: полный блок кода в тройных бэктиках с пометкой `// file: path` или `<!-- file: path -->` в первой строке. Код полностью: HTML+CSS+JS в одном или двух блоках. Минимум prose — одна итоговая строка в конце.' }
-            ]);
-            if (!fr.error && fr.text) {
-              const fch = extractCodeChanges(fr.text);
-              if (fch.length) {
-                onStep && onStep('Записываю файлы из повтора: ' + fch.map(c => c.path).join(', '));
-                const safe = await sanitizeChanges(fch, onStep);
-                if (safe.length) await applyCodeChanges(safe);
-                ok.push({ id: forced.id, text: fr.text });
-              }
-            }
-          } catch (e) { onStep && onStep('Повтор multi упал: ' + e.message); }
-        }
-      } catch (e) {
-        console.warn('[orchestrator] pre-write failed:', e);
-      }
-      const blocks = ok.map(r => '### ' + r.id + '\n' + r.text).join('\n\n---\n\n');
-      onStep && onStep('Синтез финального ответа…');
-      let synth;
-      // Синтезатор должен быть лёгким — без полного workspace-контекста, иначе превысим лимит.
-      const synthMsgs = [
-        { role: 'system', content: 'Синтезатор. ОБЯЗАТЕЛЬНО сохраняй все блоки кода с пометкой `// file: path`, `<!-- file: path -->` или подобные — КАК ЕСТЬ, не перефразируй и не теряй. Объедини лучшие части ответов в один точный ответ на русском. Не упоминай, что было несколько моделей.\n\n=== ТОН: REPLIT-AGENT ===\nПиши как инженер в Slack — не эссеист. Не более 2-4 предложений prose. Без вступлений: «Давайте», «Хорошо», «Сейчас я», «Я рассмотрю», «Мы должны», «Вот мой план», «Давайте начнём». Без объяснений очевидного. Без встречных вопросов в конце. Формат — что изменено одной строкой через запятую + одно предложение пояснения при необходимости.' },
-        { role: 'user', content: 'Запрос:\n<<<\n' + content + '>>>\n\nОтветы:\n' + blocks }
-      ];
-      try { synth = await callOpenAI(routerModel, synthMsgs); }
-      catch (err) {
-        onStep && onStep('Синтез упал: ' + err.message);
-        return { text: ok[0].text, model: ok[0].id };
-      }
-      if (synth.error) {
-        onStep && onStep('Синтез: ' + synth.error);
-        return { text: ok[0].text, error: 'Синтез: ' + synth.error, model: synth.model };
-      }
-      return { text: synth.text, model: routerModel };
+    return { text: '', error: 'Неизвестное действие: ' + decision.action, model: routerModel };
+  }
+
+  async function runMulti(content, onStep, attachments, history, hasImageAttachment, routerModel) {
+    let ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
+    const estimatedCost = ids.reduce((sum, id) => sum + estimateCost(id, 1500, 1500), 0);
+    if (estimatedCost > BUDGET_RUB) {
+      onStep && onStep('Router выбрал неподходящие модели → пересобираю');
+      ids = pickModelsUnderBudget(hasImageAttachment, BUDGET_RUB, 2, 3);
     }
-    return { text: routerResp, model: routerModel };
+    const maxTokensList = allocateMaxTokens(ids, BUDGET_RUB, 1500);
+    onStep && onStep('Параллельный опрос моделей…');
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const results = await Promise.all(ids.map(async (id, idx) => {
+      await sleep(idx * 1200);
+      try {
+        const supportsVision = !!ORCHESTRATOR_MODELS.find(m => m.id === id)?.vision;
+        const msgs = await slimDelegateMessages(id, supportsVision, content, attachments);
+        const r = await callOpenAI(id, msgs, maxTokensList[idx]);
+        if (r.error) return { id, error: r.error };
+        return { id, text: r.text };
+      } catch (err) {
+        return { id, error: err.message };
+      }
+    }));
+    const ok = results.filter(r => r.text && !r.error);
+    const failed = results.filter(r => r.error);
+    if (failed.length) {
+      failed.forEach(f => { if (isBudgetOrModelError(f.error)) markUnavailable(f.id); });
+      onStep && onStep('Часть моделей вернула ошибку: ' + failed.map(f => f.id + ' (' + f.error + ')').join(', '));
+    }
+    if (!ok.length) {
+      return { text: '', error: 'Все модели в multi-опросе упали: ' + failed.map(f => f.id + ' [' + f.error + ']').join('; '), model: ids.join(',') };
+    }
+    try {
+      const allChanges = [];
+      for (const r of ok) {
+        const ch = extractCodeChanges(r.text);
+        if (ch.length) {
+          onStep && onStep('Записываю файлы из ' + r.id + ': ' + ch.map(c => c.path).join(', '));
+          allChanges.push(...ch);
+        }
+      }
+      if (allChanges.length) await applyCodeChanges(allChanges);
+      if (looksLikeCodeTask(content) && !allChanges.length) {
+        onStep && onStep('Ни один эксперт не выдал код — повтор одной сильной модели с требованием…');
+        const forced = ORCHESTRATOR_MODELS.find(m => m.coding && m.vision) || ORCHESTRATOR_MODELS.find(m => m.coding) || ORCHESTRATOR_MODELS[0];
+        try {
+          const fr = await callOpenAI(forced.id, [
+            ...(await delegateMessages(forced.id)),
+            { role: 'user', content: 'ПРЕДЫДУЩИЕ ОТВЕТЫ НЕ СОДЕРЖАЛИ КОДА. Повтори ответ строго в формате: полный блок кода в тройных бэктиках с пометкой `// file: path` или `<!-- file: path -->` в первой строке. Код полностью: HTML+CSS+JS в одном или двух блоках. Минимум prose — одна итоговая строка в конце.' }
+          ]);
+          if (!fr.error && fr.text) {
+            const fch = extractCodeChanges(fr.text);
+            if (fch.length) {
+              onStep && onStep('Записываю файлы из повтора: ' + fch.map(c => c.path).join(', '));
+              const safe = await sanitizeChanges(fch, onStep);
+              if (safe.length) await applyCodeChanges(safe);
+              ok.push({ id: forced.id, text: fr.text });
+            }
+          }
+        } catch (e) { onStep && onStep('Повтор multi упал: ' + e.message); }
+      }
+    } catch (e) {
+      console.warn('[orchestrator] pre-write failed:', e);
+    }
+    const blocks = ok.map(r => '### ' + r.id + '\n' + r.text).join('\n\n---\n\n');
+    onStep && onStep('Синтез финального ответа…');
+    let synth;
+    const synthMsgs = [
+      { role: 'system', content: 'Синтезатор. ОБЯЗАТЕЛЬНО сохраняй все блоки кода с пометкой `// file: path`, `<!-- file: path -->` или подобные — КАК ЕСТЬ, не перефразируй и не теряй. Объедини лучшие части ответов в один точный ответ на русском. Не упоминай, что было несколько моделей.\n\n=== ТОН: REPLIT-AGENT ===\nПиши как инженер в Slack — не эссеист. Не более 2-4 предложений prose. Без вступлений: «Давайте», «Хорошо», «Сейчас я», «Я рассмотрю», «Мы должны», «Вот мой план», «Давайте начнём». Без объяснений очевидного. Без встречных вопросов в конце. Формат — что изменено одной строкой через запятую + одно предложение пояснения при необходимости.' },
+      { role: 'user', content: 'Запрос:\n<<<\n' + content + '>>>\n\nОтветы:\n' + blocks }
+    ];
+    try { synth = await callOpenAI(routerModel, synthMsgs); }
+    catch (err) {
+      onStep && onStep('Синтез упал: ' + err.message);
+      return { text: ok[0].text, model: ok[0].id };
+    }
+    if (synth.error) {
+      onStep && onStep('Синтез: ' + synth.error);
+      return { text: ok[0].text, error: 'Синтез: ' + synth.error, model: synth.model };
+    }
+    return { text: synth.text, model: routerModel };
   }
 
   async function sendMessage() {

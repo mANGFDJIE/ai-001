@@ -1,49 +1,153 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Услуги рядом</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Обучение ИА</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --color-bg: #f0f2f5;
+      --color-primary: #222;
+      --color-accent: #4f46e5;
+      --font-family: 'Inter', sans-serif;
+    }
+    body {
+      margin: 0;
+      font-family: var(--font-family);
+      background-color: var(--color-bg);
+      color: var(--color-primary);
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      width: 100%;
+      padding: 2rem;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    header h1 {
+      font-size: 2.5rem;
+      margin: 0;
+    }
+    header p {
+      max-width: 600px;
+      margin-top: 1rem;
+      font-size: 1.2rem;
+    }
+    section {
+      width: 100%;
+      max-width: 1200px;
+      padding: 4rem 1rem;
+      display: grid;
+      gap: 2rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      padding: 2rem;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.5rem;
+    }
+    button {
+      background-color: var(--color-accent);
+      color: #fff;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #3b2fdb;
+    }
+    #features {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+    }
+    .feature {
+      flex: 1 1 300px;
+      margin: 1rem;
+    }
+    footer {
+      width: 100%;
+      padding: 2rem;
+      background: #222;
+      color: #fff;
+      text-align: center;
+    }
+    /* Анимация появления элементов */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate {
+      opacity: 0;
+      animation: fadeIn 1s forwards;
+    }
+  </style>
 </head>
 <body>
-<header class="header">
-  <h1 class="logo">Услуги рядом</h1>
-  <input type="text" id="search" placeholder="Найти услугу" class="search-input">
-</header>
-<main class="main">
-  <div class="grid" id="cards"></div>
-</main>
+  <header class="animate" style="animation-delay: 0.2s;">
+    <h1>Обучение Искусственному Интеллекту</h1>
+    <p>Овладейте передовыми технологиями AI с нашим курсом и станьте экспертом будущего</p>
+  </header>
 
-<script>
-const services = [
-  {id:1, title:'Стиральная машина', img:'https://picsum.photos/300/200?random=1', price:2000, rating:4.5, location:'Москва'},
-  {id:2, title:'Сборка мебели', img:'https://picsum.photos/300/200?random=2', price:1500, rating:4.2, location:'Санкт-Петербург'},
-  {id:3, title:'Покраска стен', img:'https://picsum.photos/300/200?random=3', price:3000, rating:4.8, location:'Новосибирск'},
-  {id:4, title:'Уборка квартиры', img:'https://picsum.photos/300/200?random=4', price:1200, rating:4.3, location:'Екатеринбург'},
-  {id:5, title:'Ремонт компьютера', img:'https://picsum.photos/300/200?random=5', price:1800, rating:4.6, location:'Казань'},
-  {id:6, title:'Курсы английского', img:'https://picsum.photos/300/200?random=6', price:5000, rating:4.9, location:'Ростов-на-Дону'},
-];
-const grid = document.getElementById('cards');
-function render(list) {
-  grid.innerHTML = list.map(s=>{
-    return `<article class="card">
-      <img src="${s.img}" alt="${s.title}">
-      <div class="card-content">
-        <h2>${s.title}</h2>
-        <div class="meta"><span>${s.location}</span> | <span>${s.price}₽</span></div>
-        <div class="rating">★ ${s.rating}</div>
-      </div>
-    </article>`;
-  }).join('');
-}
-render(services);
-document.getElementById('search').addEventListener('input', e=>{
-  const q = e.target.value.toLowerCase();
-  render(services.filter(s=>s.title.toLowerCase().includes(q)));
-});
-</script>
+  <section id="features" class="animate" style="animation-delay: 0.4s;">
+    <div class="card">
+      <h2>Практические задачи</h2>
+      <p>Работайте над реальными проектами и погружайтесь в алгоритмы машинного обучения.</p>
+    </div>
+    <div class="card">
+      <h2>Экспертное обучение</h2>
+      <p>Обучайтеся у ведущих специалистов индустрии с современными кейсами.</p>
+    </div>
+    <div class="card">
+      <h2>Гибкий график</h2>
+      <p>Учитесь в удобное для вас время и месте, в гибком формате онлайн.</p>
+    </div>
+  </section>
+
+  <section style="text-align: center; padding: 4rem 1rem;">
+    <h2 style="margin-bottom: 2rem;">Начните свой путь в AI сейчас</h2>
+    <button onclick="alert('Записаться на курс')">Записаться</button>
+  </section>
+
+  <footer>
+    &copy; 2023 Обучение ИИ — Все права защищены
+  </footer>
+
+  <script>
+    // Простая анимация при пролистывании
+    const elements = document.querySelectorAll('.animate');
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = 1;
+          entry.target.style.transform = 'translateY(0)';
+        }
+      });
+    }, { threshold: 0.1 });
+    elements.forEach(el => {
+      el.style.opacity = 0;
+      observer.observe(el);
+    });
+  </script>
 </body>
 </html>
