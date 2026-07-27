@@ -141,21 +141,25 @@
       name, label: name, desc, color: color || 'standard', featured: true,
       openai: true, apiModel: id, directVision: !!vision,
     });
-    modelPresets['vsegpt-deepseek-v3'] = VP('deepseek/deepseek-chat',
-      'DeepSeek V3 (0.07₽/1K)', 'GPT-4o / Claude 3.5 уровень — топ кодинг, логика', 'pro');
-    modelPresets['vsegpt-deepseek-r1'] = VP('deepseek/deepseek-r1',
-      'DeepSeek R1 (0.09₽/1K)', 'Reasoning o1-class — сложные баги, алгоритмы, БД', 'pro');
+    modelPresets['vsegpt-deepseek-chat'] = VP('deepseek/deepseek-chat',
+      'DeepSeek V4 Flash (0.09₽/1K)', 'Самая дешёвая DeepSeek, 1M контекст, топ кодинг', 'pro');
+    modelPresets['vsegpt-qwen3-14b'] = VP('qwen/qwen3-14b',
+      'Qwen 3 14B (0.045₽/1K)', 'Самая дешёвая умная — 0.045₽/1K, код/анализ', 'economy');
+    modelPresets['vsegpt-gemini-lite'] = VP('google/gemini-2.5-flash-lite',
+      'Gemini 2.5 Flash Lite (0.075₽/1K)', '1M контекст, быстрый, дешёвый!', 'economy');
+    modelPresets['vsegpt-devstral'] = VP('mistralai/devstral-small',
+      'Devstral Small (0.06₽/1K)', 'Mistral Devstral, tools, 0.06₽/1K, 128K контекст', 'economy');
     modelPresets['vsegpt-qwen-coder'] = VP('qwen/qwen-2.5-coder-32b-instruct',
-      'Qwen 2.5 Coder 32B (0.04₽/1K)', 'Специалист по TypeScript/React, юнит-тесты', 'standard');
-    modelPresets['vsegpt-gemini-flash'] = VP('google/gemini-2.0-flash-001',
-      'Gemini 2.0 Flash (0.05₽/1K)', '1M контекст, быстрый ответ, дешёвый', 'standard');
+      'Qwen 2.5 Coder 32B (0.10₽/1K)', 'TypeScript/React, юнит-тесты, 128K контекст', 'standard');
     modelPresets['vsegpt-llama-70b'] = VP('meta-llama/llama-3.3-70b-instruct',
-      'Llama 3.3 70B (0.07₽/1K)', 'Meta 70B — русский язык, документация, данные', 'standard');
+      'Llama 3.3 70B (0.16₽/1K)', 'Meta 70B — русский язык, 128K контекст', 'standard');
+    modelPresets['vsegpt-qwen3-32b'] = VP('qwen/qwen3-32b',
+      'Qwen 3 32B (0.07₽/1K)', 'Флагманский Qwen, код/анализ, 41K контекст', 'standard');
     // Vision модели
     modelPresets['vsegpt-llama-vision'] = VP('vis-meta-llama/llama-3.2-11b-vision-instruct',
-      '👁 Llama 3.2 11B Vision (0.11₽/1K)', 'Самый дешёвый vision: UI по скриншоту', 'pro', true);
+      '👁 Llama 3.2 11B Vision (0.11₽/1K)', 'Самый дешёвый vision: 0.11₽/1K', 'pro', true);
     modelPresets['vsegpt-gpt4o-mini-vision'] = VP('vis-openai/gpt-4o-mini',
-      '👁 GPT-4o mini Vision (0.19₽/1K)', 'OpenAI vision + кодинг — GitHub Copilot class', 'pro', true);
+      '👁 GPT-4o mini Vision (0.19₽/1K)', 'OpenAI vision + кодинг — аналог Copilot', 'pro', true);
 
     // ⭐ Groq DIRECT — бесплатно (Llama 3 70B), если есть ключ.
     if (config.hasGroq) {
@@ -1516,16 +1520,16 @@
   // Статический ростер: только дешёвые vision-модели для кода/UI/скриншотов.
   // Мульти-AI отключён.
   const BASELINE_ORCHESTRATOR_MODELS = [
-    { id: 'vis-meta-llama/llama-3.2-11b-vision-instruct', tier: 'vision', coding: true, vision: true, prompt: 0.055, completion: 0.055, name: 'V0 — Llama 3.2 11B Vision', desc: 'Самый дешёвый vision: UI по скриншоту / макету' },
-    { id: 'vis-openai/gpt-4o-mini',                       tier: 'vision', coding: true, vision: true, prompt: 0.037, completion: 0.15,  name: 'Copilot — GPT-4o mini',      desc: 'OpenAI vision + кодинг — аналог GitHub Copilot' },
-    { id: 'vis-meta-llama/llama-4-scout',                 tier: 'vision', coding: true, vision: true, prompt: 0.05,  completion: 0.16,  name: 'Replit Agent — Llama 4 Scout', desc: 'Быстрый open-source vision-кодер с tools' },
-    { id: 'vis-anthropic/claude-3-haiku',                 tier: 'vision', coding: true, vision: true, prompt: 0.066, completion: 0.30,  name: 'Claude 3 Haiku Vision',      desc: 'Антропик vision — аналог Claude' },
-    // VseGPT — 5 моделей по запросу пользователя
-    { id: 'deepseek/deepseek-chat',                      tier: 'mid',   coding: true, vision: false, prompt: 0.014, completion: 0.056, name: 'DeepSeek V3 (≤0.07₽)',       desc: 'GPT-4o / Claude 3.5 уровень, 0.07₽/1K' },
-    { id: 'deepseek/deepseek-r1',                        tier: 'mid',   coding: true, vision: false, prompt: 0.03,  completion: 0.06,  name: 'DeepSeek R1 (≤0.09₽)',       desc: 'Reasoning (o1-class), сложные баги/алгоритмы' },
-    { id: 'google/gemini-2.0-flash-001',                 tier: 'light', coding: true, vision: false, prompt: 0.01,  completion: 0.04,  name: 'Gemini 2.0 Flash (0.05₽)',   desc: 'Аналог Gemini Flash, 1M контекст, быстрый' },
-    { id: 'qwen/qwen-2.5-coder-32b-instruct',            tier: 'light', coding: true, vision: false, prompt: 0.01,  completion: 0.03,  name: 'Qwen 2.5 Coder 32B (0.04₽)', desc: 'Специалист по TypeScript/React, юнит-тесты' },
-    { id: 'meta-llama/llama-3.3-70b-instruct',           tier: 'mid',   coding: true, vision: false, prompt: 0.02,  completion: 0.05,  name: 'Llama 3.3 70B (0.07₽)',     desc: 'Meta, 70B — русский язык, документация, данные' },
+    { id: 'vis-meta-llama/llama-3.2-11b-vision-instruct', tier: 'vision', coding: true, vision: true, prompt: 0.055, completion: 0.055, name: '👁 Llama 3.2 11B Vision',    desc: 'Самый дешёвый vision: 0.055/0.055₽, UI по скриншоту' },
+    { id: 'vis-openai/gpt-4o-mini',                       tier: 'vision', coding: true, vision: true, prompt: 0.037, completion: 0.15,  name: '👁 GPT-4o mini Vision',     desc: 'OpenAI vision + кодинг: 0.037/0.15₽' },
+    // VseGPT — правильные ID и цены (реальные с api.vsegpt.ru/v1/models)
+    { id: 'deepseek/deepseek-chat',                      tier: 'light',  coding: true, vision: false, prompt: 0.03,  completion: 0.06,  name: 'DeepSeek V4 Flash (0.09₽/1K)', desc: 'Самая дешёвая DeepSeek, 1M контекст, топ кодинг' },
+    { id: 'qwen/qwen3-32b',                              tier: 'mid',    coding: true, vision: false, prompt: 0.015, completion: 0.055, name: 'Qwen 3 32B (0.07₽/1K)',     desc: 'Флагманский Qwen, код/анализ, 41K контекст' },
+    { id: 'qwen/qwen3-14b',                              tier: 'light',  coding: true, vision: false, prompt: 0.012, completion: 0.033, name: 'Qwen 3 14B (0.045₽/1K)',    desc: 'Самая дешёвая умная модель, 0.045₽/1K' },
+    { id: 'google/gemini-2.5-flash-lite',                tier: 'light',  coding: true, vision: false, prompt: 0.015, completion: 0.06,  name: 'Gemini 2.5 Flash Lite (0.075₽)', desc: '1M контекст, быстрый, дешёвый!' },
+    { id: 'mistralai/devstral-small',                    tier: 'light',  coding: true, vision: false, prompt: 0.015, completion: 0.045, name: 'Devstral Small (0.06₽/1K)',  desc: 'Mistral Devstral, tools, 0.06₽/1K' },
+    { id: 'qwen/qwen-2.5-coder-32b-instruct',            tier: 'mid',    coding: true, vision: false, prompt: 0.05,  completion: 0.05,  name: 'Qwen 2.5 Coder 32B (0.10₽)', desc: 'TypeScript/React, юнит-тесты, 128K контекст' },
+    { id: 'meta-llama/llama-3.3-70b-instruct',           tier: 'mid',    coding: true, vision: false, prompt: 0.08,  completion: 0.08,  name: 'Llama 3.3 70B (0.16₽/1K)',  desc: 'Meta 70B — русский язык, 128K контекст' },
     // Gemini через Google AI Studio (бесплатный API, 1500 запр/день, не требует карты)
     { id: 'gemini-2.0-flash',    provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.0 Flash',         desc: 'Google AI Studio ⸺ БЕСПЛАТНО 1500 запр/день, топ кодинг' },
     { id: 'gemini-2.5-flash',    provider: 'gemini', tier: 'premium', coding: true, vision: true,  prompt: 0, completion: 0, name: '⚡ Gemini 2.5 Flash',         desc: 'Google AI Studio ⸺ новейшая, мощнее Flash 2.0' },
