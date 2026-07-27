@@ -124,56 +124,54 @@
       config = await r.json();
     } catch {}
 
-    // Статический ростер VseGPT: мульти-AI и авто-скан отключены для экономии.
+    // Строим ростер.
     ORCHESTRATOR_MODELS = BASELINE_ORCHESTRATOR_MODELS.slice();
     rebuildDirectModelPresets();
 
-    // ⭐ Режим Мульти AI — Perplexity Large (бесплатно, 0₽) анализирует задачу
-    // и делегирует выполнение 1–3 лучшим моделям из ростера под бюджет 0.07₽.
+    // ⭐ Бесплатный Мульти AI — Perplexity (с подбором моделей под бюджет).
     modelPresets['perplexity-multi-router'] = {
       name: 'Perplexity Large (Free) · Мульти AI',
       label: 'Perplexity Large · Мульти AI',
       desc: 'Бесплатно (0₽/1K). Анализ → делегирование лучшим моделям',
-      color: 'pro',
-      featured: true,
-      router: 'multi',
-      openai: true,
+      color: 'pro', featured: true, router: 'multi', openai: true,
     };
 
-    // ⭐ Groq DIRECT — бесплатно (Llama 3 70B), без квот, без карт.
-    // Приоритет выше Gemini, т.к. у Gemini кончилась квота.
+    // ⭐ VseGPT Direct — главные модели для работы (всегда доступны через VseGPT).
+    const VP = (id, name, desc, color, vision) => ({
+      name, label: name, desc, color: color || 'standard', featured: true,
+      openai: true, apiModel: id, directVision: !!vision,
+    });
+    modelPresets['vsegpt-deepseek-v3'] = VP('deepseek/deepseek-chat',
+      'DeepSeek V3 (0.07₽/1K)', 'GPT-4o / Claude 3.5 уровень — топ кодинг, логика', 'pro');
+    modelPresets['vsegpt-deepseek-r1'] = VP('deepseek/deepseek-r1',
+      'DeepSeek R1 (0.09₽/1K)', 'Reasoning o1-class — сложные баги, алгоритмы, БД', 'pro');
+    modelPresets['vsegpt-qwen-coder'] = VP('qwen/qwen-2.5-coder-32b-instruct',
+      'Qwen 2.5 Coder 32B (0.04₽/1K)', 'Специалист по TypeScript/React, юнит-тесты', 'standard');
+    modelPresets['vsegpt-gemini-flash'] = VP('google/gemini-2.0-flash-001',
+      'Gemini 2.0 Flash (0.05₽/1K)', '1M контекст, быстрый ответ, дешёвый', 'standard');
+    modelPresets['vsegpt-llama-70b'] = VP('meta-llama/llama-3.3-70b-instruct',
+      'Llama 3.3 70B (0.07₽/1K)', 'Meta 70B — русский язык, документация, данные', 'standard');
+    // Vision модели
+    modelPresets['vsegpt-llama-vision'] = VP('vis-meta-llama/llama-3.2-11b-vision-instruct',
+      '👁 Llama 3.2 11B Vision (0.11₽/1K)', 'Самый дешёвый vision: UI по скриншоту', 'pro', true);
+    modelPresets['vsegpt-gpt4o-mini-vision'] = VP('vis-openai/gpt-4o-mini',
+      '👁 GPT-4o mini Vision (0.19₽/1K)', 'OpenAI vision + кодинг — GitHub Copilot class', 'pro', true);
+
+    // ⭐ Groq DIRECT — бесплатно (Llama 3 70B), если есть ключ.
     if (config.hasGroq) {
-      modelPresets['groq-direct'] = {
-        name: '⚡ Groq Llama 3 70B Direct',
-        label: 'Groq Llama 3 70B Direct',
-        desc: 'Как Replit Agent. Бесплатно, без ограничений, Llama 3 70B',
-        color: 'pro',
-        featured: true,
-        openai: true,
-        apiModel: 'llama3-70b-8192',
-        directVision: false,
-      };
+      modelPresets['groq-direct'] = VP('llama3-70b-8192',
+        '⚡ Groq Llama 3 70B (бесплатно)', 'Без ограничений, Llama 3 70B, очень быстрый', 'economy');
     }
 
-    // ⭐ Gemini DIRECT — как Replit Agent, но через Google AI Studio.
+    // ⭐ Gemini DIRECT — если есть ключ (quota может быть исчерпана).
     if (config.hasGemini) {
-      modelPresets['gemini-direct'] = {
-        name: '⚡ Gemini 2.5 Pro Direct',
-        label: 'Gemini 2.5 Pro Direct',
-        desc: 'Как Replit Agent. Одна сильная модель, без роутера, максимальное качество',
-        color: 'pro',
-        featured: true,
-        openai: true,
-        apiModel: 'gemini-2.5-pro',
-        directVision: true,
-      };
+      modelPresets['gemini-direct'] = VP('gemini-2.5-pro',
+        '⚡ Gemini 2.5 Pro (бесплатно 1500/день)', 'Google AI Studio — самая сильная, GPT-4 class', 'economy', true);
     }
 
-    // Приоритет: Groq (работает) > Gemini (квота может быть) > Perplexity (0₽).
+    // Приоритет: Perplexity (всегда работает, 0₽) > DeepSeek V3 (VseGPT) > остальные
     if (!modelPresets[currentModel] || currentModel === DEFAULT_MODEL_KEY) {
-      currentModel = config.hasGroq ? 'groq-direct'
-        : config.hasGemini ? 'gemini-direct'
-        : 'perplexity-multi-router';
+      currentModel = 'perplexity-multi-router';
     }
 
     renderModelDropdown();
